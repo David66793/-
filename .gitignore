@@ -1,0 +1,36 @@
+# Unity generated data
+UnityProject/[Ll]ibrary/
+UnityProject/[Tt]emp/
+UnityProject/[Ll]ogs/
+UnityProject/[Oo]bj/
+UnityProject/[Uu]ser[Ss]ettings/
+UnityProject/[Mm]emoryCaptures/
+UnityProject/[Rr]ecordings/
+UnityProject/.vs/
+UnityProject/*.csproj
+UnityProject/*.sln
+
+# Local builds, installers, test data and saves
+artifacts/*
+!artifacts/screenshots/
+artifacts/screenshots/*
+!artifacts/screenshots/01-home.png
+Saves/
+**/Saves/
+*.exe
+*.dll
+*.pdb
+*.zip
+
+# IDE, operating-system and crash files
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.tmp
+*.log
+*.dmp
+*.crash
+.DS_Store
+Thumbs.db

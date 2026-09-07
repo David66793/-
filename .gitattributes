@@ -1,0 +1,9 @@
+* text=auto
+*.cs text eol=crlf
+*.ps1 text eol=crlf
+*.shader text eol=lf
+*.json text eol=lf
+*.asmdef text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.png binary

@@ -1,0 +1,7 @@
+{
+  "name": "Hearthhold.Core",
+  "rootNamespace": "Hearthhold.Core",
+  "references": [],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}
