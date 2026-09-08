@@ -42,7 +42,7 @@ namespace Hearthhold.Preview
         public GameWindow(bool renderOnly)
         {
             preview = renderOnly;
-            Text = "篝火堡垒 · Hearthhold | Windows 可玩原型 0.2";
+            Text = "篝火堡垒 · Hearthhold | Windows 可玩原型 0.5";
             ClientSize = new Size(1440, 900);
             MinimumSize = new Size(1100, 760);
             StartPosition = FormStartPosition.CenterScreen;
@@ -147,7 +147,7 @@ namespace Hearthhold.Preview
             }
             Building b = PickBuilding(p); selectedId = b == null ? -1 : b.Id;
         }
-        private void CancelAction() { buildKind = null; movingId = -1; heal = false; leftDown = false; selectedId = -1; showHelp = false; showArmyGuide = false; showBattleBrief = false; demolishId = -1; hits.Clear(); }
+        private void CancelAction() { buildKind = null; movingId = -1; heal = false; leftDown = false; selectedId = -1; showHelp = false; showArmyGuide = false; showBattleBrief = false; showCampaign = false; demolishId = -1; hits.Clear(); }
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
             held.Add(e.KeyCode);
@@ -220,6 +220,7 @@ namespace Hearthhold.Preview
             if (showHelp) DrawHelp(g);
             if (showArmyGuide) DrawArmyGuide(g);
             if (showBattleBrief) DrawBattleBrief(g);
+            if (showCampaign) DrawCampaign(g);
             if (demolishId >= 0) DrawDemolition(g);
         }
         private Font FontFor(float size, bool bold)
@@ -261,7 +262,7 @@ namespace Hearthhold.Preview
             DrawEmblem(g, 45, 43);
             TextAt(g, "篝火堡垒", 77, 16, 26, Cream, true);
             TextAt(g, "H E A R T H H O L D", 79, 52, 11, Gold, true);
-            TextAt(g, "WINDOWS 原型 / 0.2", 285, 39, 11, Muted, false);
+            TextAt(g, "WINDOWS 原型 / 0.5", 285, 39, 11, Muted, false);
             Resource(g, w - 660, 20, "金币", Session.Village.Gold, Gold, false);
             Resource(g, w - 448, 20, "晶露", Session.Village.Crystal, Mint, true);
             Button(g, "操作 / F1", new RectangleF(w - 232, 25, 95, 42), delegate { showHelp = !showHelp; }, false, showHelp);
@@ -297,10 +298,11 @@ namespace Hearthhold.Preview
             TextAt(g, "从一簇篝火，到一座堡垒", 42, 212, 12, Gold, true);
             TextAt(g, (Session.Village.Buildings.Count > 17 ? "✓" : "○") + "  建设你的第一座建筑", 43, 244, 12, Cream, false);
             TextAt(g, (Session.Village.KeepLevel > 1 ? "✓" : "○") + "  升级议事堡", 43, 273, 12, Cream, false);
-            TextAt(g, (Session.Village.Wins > 0 ? "✓" : "○") + "  赢得一次远征", 43, 302, 12, Cream, false);
+            TextAt(g, (Session.Village.Wins > 0 ? "✓" : "○") + "  远征 " + Session.Village.Wins + " 胜 · 战役 " + Session.Village.TotalStars + "/30 星", 43, 302, 12, Cream, false);
             Session.Income(DateTime.UtcNow, out cachedGold, out cachedCrystal);
             Button(g, "收取产出  +" + cachedGold + " / +" + cachedCrystal, new RectangleF(40, 346, 190, 39), delegate { Session.Collect(DateTime.UtcNow); Persist(); }, false, false);
-            Button(g, "兵种图鉴  I", new RectangleF(40, 395, 190, 34), delegate { showArmyGuide = true; }, false, false);
+            Button(g, "兵种 I", new RectangleF(40, 395, 91, 34), delegate { showArmyGuide = true; }, false, false);
+            Button(g, "战役 / 成就", new RectangleF(139, 395, 91, 34), delegate { showCampaign = true; }, false, false);
         }
         private void DrawBattlePanel(Graphics g)
         {
@@ -353,10 +355,12 @@ namespace Hearthhold.Preview
                 } });
             }
             float right = w - 280;
-            Button(g, "‹", new RectangleF(right, h - 132, 36, 30), delegate { Session.MissionIndex = (Session.MissionIndex + 2) % 3; }, false, false);
+            Button(g, "‹", new RectangleF(right, h - 132, 36, 30), delegate { Session.CycleMission(-1); }, false, false);
             TextAt(g, Missions.Names[Session.MissionIndex], right + 63, h - 127, 14, Cream, true);
-            Button(g, "›", new RectangleF(w - 60, h - 132, 36, 30), delegate { Session.MissionIndex = (Session.MissionIndex + 1) % 3; }, false, false);
-            Button(g, "出发远征   →", new RectangleF(right, h - 91, 256, 50), StartBattle, true, false);
+            bool unlocked = Session.Village.IsMissionUnlocked(Session.MissionIndex);
+            TextAt(g, unlocked ? "★ " + Session.Village.CampaignStars[Session.MissionIndex] + "/3 · 最佳 " + Session.Village.CampaignBest[Session.MissionIndex] + "%" : "尚未解锁", right + 62, h - 106, 10, unlocked ? Muted : Color.Salmon, false);
+            Button(g, "›", new RectangleF(w - 60, h - 132, 36, 30), delegate { Session.CycleMission(1); }, false, false);
+            Button(g, unlocked ? "出发远征   →" : "先通关上一关", new RectangleF(right, h - 82, 256, 41), unlocked ? (Action)StartBattle : delegate { Session.Notice = "该关卡尚未解锁。"; }, true, false);
         }
         private void DrawArmyBar(Graphics g)
         {

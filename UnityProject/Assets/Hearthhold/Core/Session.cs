@@ -119,8 +119,28 @@ namespace Hearthhold.Core
         {
             if (Battle != null) return;
             if (Village.Count(BuildingKind.Barracks) == 0) { Notice = "请先建造远征营，再率领部队出征。"; return; }
+            if (MissionIndex < 0 || MissionIndex >= Missions.Count) MissionIndex = 0;
+            if (!Village.IsMissionUnlocked(MissionIndex)) { Notice = "该关卡尚未解锁。先在上一关获得至少1颗星。"; return; }
             Battle = new Battle(MissionIndex);
             Notice = "侦察阶段 · 在外围投下第一名士兵后开始计时。";
+        }
+        public void CycleMission(int direction)
+        {
+            MissionIndex = (MissionIndex + direction % Missions.Count + Missions.Count) % Missions.Count;
+            Notice = Village.IsMissionUnlocked(MissionIndex) ? Missions.Names[MissionIndex] + " · 最佳 " + Village.CampaignStars[MissionIndex] + "星 / " + Village.CampaignBest[MissionIndex] + "%" : Missions.Names[MissionIndex] + "尚未解锁。";
+        }
+        public bool ClaimAchievement(string id)
+        {
+            AchievementSpec spec = Achievements.Find(id);
+            if (spec == null || Village.HasClaimed(id)) { Notice = "该成就奖励已经领取或不存在。"; return false; }
+            int progress = Achievements.Progress(Village, spec);
+            if (progress < spec.Target) { Notice = "成就尚未完成：" + progress + " / " + spec.Target + "。"; return false; }
+            if (Village.Gold + spec.GoldReward > Village.Capacity || Village.Crystal + spec.CrystalReward > Village.Capacity)
+            { Notice = "仓库空间不足，先消费资源再领取完整奖励。"; return false; }
+            Village.Gold += spec.GoldReward; Village.Crystal += spec.CrystalReward;
+            Village.ClaimedAchievements.Add(spec.Id);
+            Notice = "成就达成：" + spec.Name + "，领取 " + spec.GoldReward + " 金 / " + spec.CrystalReward + " 晶。";
+            return true;
         }
         public bool Settle()
         {
@@ -129,7 +149,8 @@ namespace Hearthhold.Core
             Village.Gold = Math.Min(Village.Capacity, Village.Gold + Battle.GoldReward);
             Village.Crystal = Math.Min(Village.Capacity, Village.Crystal + Battle.CrystalReward);
             if (Battle.Stars > 0) Village.Wins++;
-            Notice = "远征结束：" + Battle.Stars + " 星，获得 " + Battle.GoldReward + " 金币。";
+            bool record = Village.RecordMission(Battle.Mission, Battle.Stars, Battle.Destruction);
+            Notice = "远征结束：" + Battle.Stars + " 星，获得 " + Battle.GoldReward + " 金币。" + (record ? " 新的战役纪录已保存。" : "");
             return true;
         }
         public void ReturnHome()
@@ -183,6 +204,14 @@ namespace Hearthhold.Core
         {
             if (v == null || v.Version != 1 || v.Buildings == null || v.Buildings.Count > 1200 || v.Wins < 0)
                 throw new InvalidDataException("不支持的存档版本或数据。");
+            v.EnsureProgress();
+            if (v.CampaignStars.Count != Missions.Count || v.CampaignBest.Count != Missions.Count || v.ClaimedAchievements.Count > Achievements.Specs.Length)
+                throw new InvalidDataException("战役进度数据无效。");
+            for (int i = 0; i < Missions.Count; i++) if (v.CampaignStars[i] < 0 || v.CampaignStars[i] > 3 || v.CampaignBest[i] < 0 || v.CampaignBest[i] > 100)
+                throw new InvalidDataException("战役成绩数据无效。");
+            HashSet<string> claimed = new HashSet<string>();
+            foreach (string id in v.ClaimedAchievements) if (string.IsNullOrEmpty(id) || Achievements.Find(id) == null || !claimed.Add(id))
+                throw new InvalidDataException("成就领取数据无效。");
             HashSet<int> ids = new HashSet<int>();
             int keepCount = 0, maxId = 0;
             foreach (Building b in v.Buildings)

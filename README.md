@@ -1,6 +1,6 @@
 # 篝火堡垒 · Hearthhold
 
-Windows PC 原型，版本 0.4.0-preview。原创的建造与异步攻城方向项目。
+Windows PC 原型，版本 0.5.0-preview。原创的建造与异步攻城方向项目。
 
 当前交付包括一个轻量的 Windows 原生试玩程序，以及共享相同 C# 规则、战斗逻辑和模型几何的 Unity 3D Windows 试玩版。原生程序用 WinForms/GDI+ 绘制等距画面；Unity 客户端把同一份几何转为 URP 三维网格。Unity 端已完成首次导入、脚本编译、Windows x64 构建和实际画面烟雾测试。
 
@@ -12,7 +12,7 @@ Git 仓库只保存源码、配置、测试和必要文档，不提交可执行�
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-preview.ps1 -Test -Package
 ```
 
-随后双击 `artifacts/WindowsPreview/Hearthhold.exe`，或解压 `artifacts/Hearthhold-0.2.0-win-x64.zip`。运行环境为 Windows x64 和 .NET Framework 4.x；本机已完成编译和交互验证，无需 Unity 或 .NET SDK。
+随后双击 `artifacts/WindowsPreview/Hearthhold.exe`，或解压 `artifacts/Hearthhold-0.5.0-native-win-x64.zip`。运行环境为 Windows x64 和 .NET Framework 4.x；本机已完成编译和交互验证，无需 Unity 或 .NET SDK。
 
 Unity 3D 版使用 Unity `6000.6.0f1` 构建：
 
@@ -20,14 +20,18 @@ Unity 3D 版使用 Unity `6000.6.0f1` 构建：
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-unity.ps1 -Action Build -Package
 ```
 
-构建后运行 `artifacts/WindowsUnity/Hearthhold.exe`，发布包为 `artifacts/Hearthhold-0.4.0-unity-win-x64.zip`。首次构建需要已安装、登录并激活的 Unity 编辑器；发布包运行时不需要安装 Unity。
+构建后运行 `artifacts/WindowsUnity/Hearthhold.exe`，发布包为 `artifacts/Hearthhold-0.5.0-unity-win-x64.zip`。首次构建需要已安装、登录并激活的 Unity 编辑器；发布包运行时不需要安装 Unity。
 
 第一次进入时，已有一座主城、两座金矿、一座晶露池、一座远征营、两座防御建筑和一段城墙，初始资源足够体验建造与升级。可以先收取产出、摆放建筑，再点右下角“出发远征”。
 
-![Unity 3D 基地画面](artifacts/screenshots/20-unity-home-v04.png)
+![Unity 3D 基地画面](artifacts/screenshots/23-unity-home-v05.png)
 
 ## 本轮更新
 
+- 0.5 新增 10 关原创 PvE 战役：从松林前哨到晨火王庭，包含开放缺口、完整外墙、十字隔墙、双环和分区迷阵等布局；至少获得1星才能解锁下一关。
+- 每关持久化最高星级与最佳破坏率，聚落显示总星数；旧版存档读取时自动补齐战役进度，不修改原有建筑和资源。
+- 新增 5 个成就及手动领取奖励，覆盖建造、议事堡升级、首次胜利、累计星数和攻克关卡数；仓库不足时不会吞掉奖励。
+- Unity 与轻量 Windows 客户端都加入战役/成就面板、锁定提示和关卡纪录；成品自动验收扩展为聚落、战役地图和最终关卡三种场景。
 - 0.4 强化 Unity 表现层：建筑选中圆环、带模型的建造/移动预览、橙色投兵边界和平滑兵种移动。
 - 远征加入三维远程弹道、近战冲击圈、治疗范围圈、受击闪光与建筑摧毁碎片；血条会按健康、受伤、濒危变色。
 - 战斗信息显示存活与待命人数，地图投兵提示增加高对比底板；新增首页和交战阶段两套成品烟雾测试。
@@ -92,7 +96,7 @@ Unity：`Application.persistentDataPath/village.xml`。两个客户端默认使�
 
 每 15 秒以及建造、升级、拆除、收取、结算、正常退出时保存。战斗中关闭程序会放弃未结算的本场进度，保留自己的基地。战斗回放/断点续战没有实现。
 
-0.2 兼容 0.1 存档。更新前退出游戏并备份 `Saves` 文件夹；在原目录替换程序即可继续原村庄，换目录则手动复制 `Saves`。旧存档中超出新上限的建筑会保留，可以移动或拆除，但数量降到上限以下前不能再建同类建筑。本次开发没有修改用户存档。
+0.5 兼容 0.1、0.2 和 0.4 存档。更新前退出游戏并备份 `Saves` 文件夹；在原目录替换程序即可继续原村庄，换目录则手动复制 `Saves`。旧存档首次读取时补齐空白战役记录；原有建筑、资源和超限建筑都会保留。本次开发测试没有修改用户正式存档。
 
 不要在同一个目录同时启动多个试玩实例；当前存档没有跨进程写入锁。如果主存档与备份都损坏，程序报错退出，不会自动创建新村覆盖它们。
 
@@ -116,11 +120,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-preview.ps1 -T
 4. 选择菜单 `Hearthhold > Open main scene`，点击 Play。场景和游戏对象在运行时生成，编辑模式的初始场景为空是预期行为。
 5. 选择 `Hearthhold > Build Windows x64`，构建到 `artifacts/WindowsUnity`。
 
-**当前机器已使用 Unity 6000.6.0f1 / URP 17.6.0 实际完成 Windows x64 构建。** 构建日志包含 `Build Finished, Result: Success` 和本轮输出路径标记；运行时双场景烟雾测试以独立测试存档启动程序，分别渲染 1440×900 聚落与交战画面并以退出码 0 结束。
+**当前机器已使用 Unity 6000.6.0f1 / URP 17.6.0 实际完成 Windows x64 构建。** 构建日志包含 `Build Finished, Result: Success` 和本轮输出路径标记；三项运行时烟雾测试以独立测试存档启动程序，分别渲染 1440×900 聚落、战役进度与第10关交战画面并以退出码 0 结束。
 
-Unity 客户端已接入新版网格、顶点色光照材质、拆除确认、建造上限、兵种图鉴和首次出征引导。自动构建、聚落与交战渲染已经验证；三场远征逐关人工验收和持续性能测试仍待完成，不能把烟雾测试视为全部玩法验收。
+Unity 客户端已接入新版网格、顶点色光照材质、拆除确认、建造上限、兵种图鉴和首次出征引导。自动构建、三类验收画面与规则层10关通关已经验证；10关逐关人工试玩和持续性能测试仍待完成，不能把烟雾测试视为全部玩法验收。
 
-![Unity 0.4 战斗表现](artifacts/screenshots/21-unity-battle-v04.png)
+![Unity 0.5 战役进度](artifacts/screenshots/24-unity-campaign-v05.png)
+
+![Unity 0.5 最终关卡](artifacts/screenshots/25-unity-final-mission-v05.png)
 
 2026-09-06 环境推进：默认官方下载入口实际返回 Hub 3.3.6，安装后其列表只包含 2020—2022 系列编辑器；随后使用官方指定版本入口取得 Hub 3.21.0，并成功升级到 `C:\Program Files\Unity Hub\Unity Hub.exe`。新安装器为 `artifacts/Installers/UnityHubSetup-3.21.0-x64.exe`，数字签名验证通过，签名主体为 Unity Technologies SF。安装器不包含在 0.2 试玩压缩包中。
 
@@ -162,8 +168,8 @@ Hearthhold/
 
 ## 范围说明
 
-这一版是第二轮可玩原型迭代，不是完整商业游戏。模型已从简单占位体块改为原创程序化细节模型，但仍未完成正式美术、角色骨骼和动作制作。尚未实现：联网账号、匹配、服务端校验、部落系统、训练/升级计时队列、10 个关卡、第二种法术、框选多建筑、完整音效、保存的战斗回放与设置持久化。
+这一版是 0.5 可玩原型迭代，不是完整商业游戏。模型已从简单占位体块改为原创程序化细节模型，但仍未完成正式美术、角色骨骼和动作制作。尚未实现：联网账号、匹配、服务端校验、部落系统、训练/升级计时队列、第二种法术、框选多建筑、完整音效、保存的战斗回放与设置持久化。
 
 本地存档可修改、本地时钟可调整，均不能作为在线经济的信任来源。在线版需建立独立权威进度、战斗凭据和数据库事务结算。固定整数步长的回归测试证明同一运行环境下结果可复现，跨 Unity/服务端运行时的一致性仍须验证。
 
-地图、模型、图形和名称均由本项目代码生成，没有使用《部落冲突》的原作素材。
+地图、模型、图形和名称均由本项目代码生成，没有使用《部落冲突》或参考私服的素材、协议与数据。外部项目的用途边界和本轮独立实现清单见 [`docs/REFERENCES.md`](docs/REFERENCES.md)。

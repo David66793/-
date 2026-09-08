@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'Home', 'Battle')][string]$Case = 'All',
+    [ValidateSet('All', 'Home', 'Campaign', 'Battle')][string]$Case = 'All',
     [string]$PlayerPath = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -12,14 +12,15 @@ $taskScreenshots = Join-Path $taskRoot 'artifacts\screenshots'
 $taskLogs = Join-Path $taskRoot 'artifacts\UnityLogs'
 New-Item -ItemType Directory -Path $taskScreenshots, $taskLogs -Force | Out-Null
 
-function Invoke-HearthholdSmoke([string]$Name, [string]$FileName, [bool]$Battle) {
+function Invoke-HearthholdSmoke([string]$Name, [string]$FileName, [string]$Mode) {
     $taskShot = Join-Path $taskScreenshots $FileName
     $taskLog = Join-Path $taskLogs ('player-smoke-' + $Name + '.log')
     $taskArguments = @(
         '-force-d3d11', '-screen-width', '1440', '-screen-height', '900', '-popupwindow',
         '-hearthhold-smoke', ('"' + $taskShot + '"')
     )
-    if ($Battle) { $taskArguments += '-hearthhold-smoke-battle' }
+    if ($Mode -eq 'Battle') { $taskArguments += '-hearthhold-smoke-battle' }
+    if ($Mode -eq 'Campaign') { $taskArguments += '-hearthhold-smoke-campaign' }
     $taskArguments += @('-logFile', ('"' + $taskLog + '"'))
     $taskStarted = [DateTime]::UtcNow
     Write-Output ('Starting ' + $Name + ' smoke test. The game window closes automatically.')
@@ -33,5 +34,6 @@ function Invoke-HearthholdSmoke([string]$Name, [string]$FileName, [bool]$Battle)
     Write-Output ($Name + ' smoke test passed: ' + $taskShot + ' (' + $taskImage.Length + ' bytes)')
 }
 
-if ($Case -eq 'All' -or $Case -eq 'Home') { Invoke-HearthholdSmoke 'home-v04' '20-unity-home-v04.png' $false }
-if ($Case -eq 'All' -or $Case -eq 'Battle') { Invoke-HearthholdSmoke 'battle-v04' '21-unity-battle-v04.png' $true }
+if ($Case -eq 'All' -or $Case -eq 'Home') { Invoke-HearthholdSmoke 'home-v05' '23-unity-home-v05.png' 'Home' }
+if ($Case -eq 'All' -or $Case -eq 'Campaign') { Invoke-HearthholdSmoke 'campaign-v05' '24-unity-campaign-v05.png' 'Campaign' }
+if ($Case -eq 'All' -or $Case -eq 'Battle') { Invoke-HearthholdSmoke 'final-mission-v05' '25-unity-final-mission-v05.png' 'Battle' }

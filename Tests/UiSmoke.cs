@@ -80,6 +80,12 @@ internal static class UiSmoke
                 Click(game, 720, 590);
                 Check(session.Battle == null && session.Village.Gold == resultGold, "Return button does not duplicate reward");
                 Render(game, "07-returned-home");
+                Click(game, 184, 412); Render(game, "22-campaign-progress");
+                Check((bool)typeof(GameWindow).GetField("showCampaign", Hidden).GetValue(game), "Campaign and achievements panel opens from home");
+                Click(game, 950, 265);
+                Check(session.Village.HasClaimed("builder"), "Ready achievement reward can be claimed from campaign panel");
+                Click(game, 720, 726);
+                Check(!(bool)typeof(GameWindow).GetField("showCampaign", Hidden).GetValue(game), "Campaign panel can be dismissed");
                 Key(game, Keys.F1); Render(game, "08-help");
                 Click(game, 720, 657);
                 Check(!(bool)typeof(GameWindow).GetField("showHelp", Hidden).GetValue(game), "Help modal can be dismissed");

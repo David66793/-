@@ -5,11 +5,11 @@ namespace Hearthhold.UnityClient
 {
     public sealed partial class GameBootstrap
     {
-        private bool showArmyGuide, showBrief, briefSeen;
+        private bool showArmyGuide, showBrief, briefSeen, showCampaign;
         private int demolishId = -1;
         private TroopKind guideTroop = TroopKind.Guardian;
-        private bool ExtraModal { get { return showArmyGuide || showBrief || demolishId >= 0; } }
-        private void CloseExtraModals() { showArmyGuide = false; showBrief = false; demolishId = -1; }
+        private bool ExtraModal { get { return showArmyGuide || showBrief || showCampaign || demolishId >= 0; } }
+        private void CloseExtraModals() { showArmyGuide = false; showBrief = false; showCampaign = false; demolishId = -1; }
         private void AskDemolish()
         {
             Building b = session.Find(selected);
@@ -53,6 +53,35 @@ namespace Hearthhold.UnityClient
                 if (GUI.Button(new Rect(x + 25, y + 449, (w - 65) / 2, 48), "保留建筑")) demolishId = -1;
                 if (GUI.Button(new Rect(x + 40 + (w - 65) / 2, y + 449, (w - 65) / 2, 48), "确认拆除"))
                 { int id = demolishId; demolishId = -1; if (session.Demolish(id)) { selected = -1; RebuildBuildings(); Save(); } }
+            }
+            else if (showCampaign)
+            {
+                GUI.Label(new Rect(x + 25, y + 22, w - 50, 40), "战役地图 · " + session.Village.TotalStars + " / 30 星", heading);
+                GUI.Label(new Rect(x + 25, y + 62, (w - 65) / 2, 26), "逐关获得至少1星即可解锁下一站", small);
+                GUI.Label(new Rect(x + 40 + (w - 65) / 2, y + 62, (w - 65) / 2, 26), "成就奖励需要手动领取", small);
+                float column = (w - 65) / 2;
+                for (int i = 0; i < Missions.Count; i++)
+                {
+                    bool unlocked = session.Village.IsMissionUnlocked(i);
+                    string result = unlocked ? session.Village.CampaignStars[i] + "星 · 最佳" + session.Village.CampaignBest[i] + "%" : "未解锁";
+                    bool enabled = GUI.enabled; GUI.enabled = enabled && unlocked;
+                    if (GUI.Button(new Rect(x + 25, y + 92 + i * 35, column, 30), (i + 1) + "  " + Missions.Names[i] + "    " + result))
+                    { session.MissionIndex = i; showCampaign = false; session.Notice = Missions.Descriptions[i]; }
+                    GUI.enabled = enabled;
+                }
+                for (int i = 0; i < Achievements.Specs.Length; i++)
+                {
+                    AchievementSpec achievement = Achievements.Specs[i];
+                    int progress = Achievements.Progress(session.Village, achievement);
+                    bool claimed = session.Village.HasClaimed(achievement.Id), ready = progress >= achievement.Target;
+                    string state = claimed ? "已领取" : ready ? "点击领取" : progress + " / " + achievement.Target;
+                    string reward = achievement.GoldReward + "金 / " + achievement.CrystalReward + "晶";
+                    bool enabled = GUI.enabled; GUI.enabled = enabled && !claimed && ready;
+                    if (GUI.Button(new Rect(x + 40 + column, y + 92 + i * 70, column, 62), achievement.Name + " · " + state + "\n" + achievement.Description + " · " + reward))
+                    { if (session.ClaimAchievement(achievement.Id)) Save(); }
+                    GUI.enabled = enabled;
+                }
+                if (GUI.Button(new Rect(x + 25, y + 462, w - 50, 44), "返回聚落")) showCampaign = false;
             }
             else if (showBrief)
             {

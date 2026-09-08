@@ -17,7 +17,7 @@ namespace Hearthhold.UnityClient
         private readonly Dictionary<int, GameObject> unitViews = new Dictionary<int, GameObject>();
         private readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>();
         private string savePath, fatalError, smokeCapturePath;
-        private bool smokeBattle;
+        private bool smokeBattle, smokeCampaign;
         private DateTime smokeRequestedUtc;
         private int smokeFrames;
         private int selected = -1, moving = -1;
@@ -42,6 +42,7 @@ namespace Hearthhold.UnityClient
             Application.targetFrameRate = 60;
             smokeCapturePath = CommandLineValue("-hearthhold-smoke");
             smokeBattle = HasCommandLineFlag("-hearthhold-smoke-battle");
+            smokeCampaign = HasCommandLineFlag("-hearthhold-smoke-campaign");
             if (!string.IsNullOrEmpty(smokeCapturePath))
             {
                 Application.runInBackground = true;
@@ -80,6 +81,7 @@ namespace Hearthhold.UnityClient
             InitializePresentation();
             RebuildBuildings();
             if (smokeBattle) PrepareBattleSmoke();
+            else if (smokeCampaign) PrepareCampaignSmoke();
             else if (!string.IsNullOrEmpty(smokeCapturePath)) PrepareHomeSmoke();
             uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei UI", "Microsoft YaHei", "Arial" }, 16);
         }
@@ -349,10 +351,11 @@ namespace Hearthhold.UnityClient
             if (session.Battle == null)
             {
                 GUI.Label(new Rect(36, 132, 200, 36), "你的聚落", heading);
-                GUI.Label(new Rect(36, 178, 200, 50), "议事堡 " + session.Village.KeepLevel + " 级\n远征胜利 " + session.Village.Wins + " 次", label);
+                GUI.Label(new Rect(36, 178, 200, 65), "议事堡 " + session.Village.KeepLevel + " 级\n远征胜利 " + session.Village.Wins + " 次  ·  战役 " + session.Village.TotalStars + "/30 星", label);
                 int gold, crystal; session.Income(DateTime.UtcNow, out gold, out crystal);
                 if (GUI.Button(new Rect(35, 252, 194, 44), "收取 " + gold + " 金 / " + crystal + " 晶")) { session.Collect(DateTime.UtcNow); Save(); }
-                if (GUI.Button(new Rect(35, 304, 194, 32), "兵种图鉴 I")) showArmyGuide = true;
+                if (GUI.Button(new Rect(35, 304, 93, 32), "兵种 I")) showArmyGuide = true;
+                if (GUI.Button(new Rect(136, 304, 93, 32), "战役 / 成就")) showCampaign = true;
             }
             else
             {
@@ -393,10 +396,14 @@ namespace Hearthhold.UnityClient
                     }
                 }
                 GUI.backgroundColor = Color.white;
-                if (GUI.Button(new Rect(Screen.width - 277, Screen.height - 130, 32, 30), "<")) session.MissionIndex = (session.MissionIndex + 2) % 3;
+                if (GUI.Button(new Rect(Screen.width - 277, Screen.height - 130, 32, 30), "<")) session.CycleMission(-1);
                 GUI.Label(new Rect(Screen.width - 230, Screen.height - 128, 162, 30), Missions.Names[session.MissionIndex], label);
-                if (GUI.Button(new Rect(Screen.width - 54, Screen.height - 130, 32, 30), ">")) session.MissionIndex = (session.MissionIndex + 1) % 3;
-                if (GUI.Button(new Rect(Screen.width - 277, Screen.height - 91, 255, 42), "出发远征 →")) BeginBattle();
+                bool unlocked = session.Village.IsMissionUnlocked(session.MissionIndex);
+                GUI.Label(new Rect(Screen.width - 230, Screen.height - 108, 205, 24), unlocked ? "★ " + session.Village.CampaignStars[session.MissionIndex] + "/3  ·  最佳 " + session.Village.CampaignBest[session.MissionIndex] + "%" : "尚未解锁", small);
+                if (GUI.Button(new Rect(Screen.width - 54, Screen.height - 130, 32, 30), ">")) session.CycleMission(1);
+                bool previousEnabled = GUI.enabled; GUI.enabled = previousEnabled && unlocked;
+                if (GUI.Button(new Rect(Screen.width - 277, Screen.height - 82, 255, 33), unlocked ? "出发远征 →" : "先通关上一关")) BeginBattle();
+                GUI.enabled = previousEnabled;
             }
             else
             {
@@ -420,7 +427,7 @@ namespace Hearthhold.UnityClient
                 Battle b = session.Battle; float x = Screen.width / 2f - 220, y = Screen.height / 2f - 145;
                 Box(new Rect(x, y, 440, 290));
                 GUI.Label(new Rect(x + 34, y + 25, 380, 45), b.Stars > 0 ? "远征凯旋" : "远征结束", heading);
-                GUI.Label(new Rect(x + 34, y + 86, 380, 113), "破坏率 " + b.Destruction + "%   /   " + b.Stars + " 星\n+ " + b.GoldReward + " 金币\n+ " + b.CrystalReward + " 晶露", label);
+                GUI.Label(new Rect(x + 34, y + 86, 380, 125), "破坏率 " + b.Destruction + "%   /   " + b.Stars + " 星\n+ " + b.GoldReward + " 金币  /  + " + b.CrystalReward + " 晶露\n关卡最佳 " + session.Village.CampaignStars[b.Mission] + " 星 · " + session.Village.CampaignBest[b.Mission] + "%", label);
                 if (GUI.Button(new Rect(x + 32, y + 219, 376, 45), "返回聚落")) ReturnHome();
             }
             if (help)

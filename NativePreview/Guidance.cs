@@ -6,10 +6,10 @@ namespace Hearthhold.Preview
 {
     public sealed partial class GameWindow
     {
-        private bool showArmyGuide, showBattleBrief, battleBriefSeen;
+        private bool showArmyGuide, showBattleBrief, battleBriefSeen, showCampaign;
         private int demolishId = -1;
         private TroopKind guideTroop = TroopKind.Guardian;
-        private bool ModalActive { get { return showHelp || showArmyGuide || showBattleBrief || demolishId >= 0; } }
+        private bool ModalActive { get { return showHelp || showArmyGuide || showBattleBrief || showCampaign || demolishId >= 0; } }
         private void RequestDemolition()
         {
             Building b = Session.Find(selectedId);
@@ -120,6 +120,42 @@ namespace Hearthhold.Preview
             TextBox(g, "在虚线圈外点击投兵，按住可连续投放。首次投兵后才开始180秒计时。铁卫受伤时按Q，在友军附近释放治疗。", new RectangleF(x + 30, y + 404, width - 60, 58), 14, Cream);
             TextAt(g, "胜利星级：摧毁议事堡 / 破坏率50% / 破坏率100%，各得一星。", x + 30, y + 466, 12, Muted, false);
             Button(g, "知道了，开始侦察", new RectangleF(x + 28, y + 510, width - 56, 40), delegate { showBattleBrief = false; battleBriefSeen = true; }, true, false);
+        }
+        private void DrawCampaign(Graphics g)
+        {
+            ModalBackdrop(g);
+            float width = Math.Min(ClientSize.Width - 70, 950), height = Math.Min(ClientSize.Height - 50, 620);
+            float x = (ClientSize.Width - width) / 2, y = (ClientSize.Height - height) / 2;
+            Panel(g, new RectangleF(x, y, width, height), Color.FromArgb(26, 43, 36), Gold, 16);
+            TextAt(g, "战役地图 · " + Session.Village.TotalStars + " / 30 星", x + 27, y + 22, 27, Cream, true);
+            float column = (width - 72) / 2;
+            TextAt(g, "逐关获得至少1星，解锁下一站", x + 28, y + 63, 12, Muted, false);
+            TextAt(g, "成就奖励", x + 45 + column, y + 63, 12, Muted, false);
+            for (int i = 0; i < Missions.Count; i++)
+            {
+                int mission = i;
+                float rowY = y + 91 + mission * 39; bool unlocked = Session.Village.IsMissionUnlocked(mission);
+                string record = unlocked ? Session.Village.CampaignStars[mission] + "星 · " + Session.Village.CampaignBest[mission] + "%" : "未解锁";
+                RectangleF row = new RectangleF(x + 27, rowY, column, 33);
+                if (unlocked) Button(g, (mission + 1) + "  " + Missions.Names[mission] + "    " + record, row, delegate { Session.MissionIndex = mission; showCampaign = false; Session.Notice = Missions.Descriptions[mission]; }, false, false);
+                else { Panel(g, row, Color.FromArgb(31, 45, 39), Color.FromArgb(54, 67, 59), 6); TextAt(g, (mission + 1) + "  " + Missions.Names[mission] + "    " + record, row.X + 12, row.Y + 8, 11, Muted, false); }
+            }
+            for (int i = 0; i < Achievements.Specs.Length; i++)
+            {
+                AchievementSpec achievement = Achievements.Specs[i], capturedAchievement = achievement;
+                int progress = Achievements.Progress(Session.Village, achievement);
+                bool claimed = Session.Village.HasClaimed(achievement.Id), ready = progress >= achievement.Target;
+                string state = claimed ? "已领取" : ready ? "可领取" : progress + "/" + achievement.Target;
+                RectangleF row = new RectangleF(x + 45 + column, y + 91 + i * 78, column, 68);
+                if (ready && !claimed) Button(g, achievement.Name + " · " + state + "  +" + achievement.GoldReward + "金/" + achievement.CrystalReward + "晶", row, delegate { if (Session.ClaimAchievement(capturedAchievement.Id)) Persist(); }, true, false);
+                else
+                {
+                    Panel(g, row, Color.FromArgb(33, 51, 42), claimed ? Mint : Color.FromArgb(66, 84, 68), 7);
+                    TextAt(g, achievement.Name + " · " + state, row.X + 12, row.Y + 10, 13, claimed ? Mint : Cream, true);
+                    TextAt(g, achievement.Description + "  ·  " + achievement.GoldReward + "金/" + achievement.CrystalReward + "晶", row.X + 12, row.Y + 38, 10, Muted, false);
+                }
+            }
+            Button(g, "返回聚落", new RectangleF(x + 27, y + height - 52, width - 54, 38), delegate { showCampaign = false; }, true, false);
         }
     }
 }

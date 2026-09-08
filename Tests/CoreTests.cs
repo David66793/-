@@ -15,7 +15,7 @@ internal static class CoreTests
         Stopwatch watch = Stopwatch.StartNew();
         try
         {
-            Construction(); Economy(); Persistence(); Combat(); Determinism(); MissionsCheck(); LimitsAndDemolition(); ModelChecks();
+            Construction(); Economy(); Persistence(); Combat(); Determinism(); MissionsCheck(); Progression(); LimitsAndDemolition(); ModelChecks();
             Console.WriteLine("\n" + count + " checks passed in " + watch.Elapsed.TotalSeconds.ToString("F2") + "s."); return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
@@ -146,6 +146,12 @@ internal static class CoreTests
         string message;
         VillageData read = SaveStore.Load(path, out message);
         Check(read.Buildings.Count == v.Buildings.Count && read.Gold == v.Gold, "Save roundtrip preserves settlement");
+        string legacyPath = Path.Combine(directory, "legacy-v02.xml");
+        string legacyXml = File.ReadAllText(path);
+        foreach (string element in new[] { "CampaignStars", "CampaignBest", "ClaimedAchievements" }) legacyXml = WithoutElement(legacyXml, element);
+        File.WriteAllText(legacyPath, legacyXml);
+        VillageData legacyRead = SaveStore.Load(legacyPath, out message);
+        Check(legacyRead.CampaignStars.Count == Missions.Count && legacyRead.UnlockedMissionCount == 1, "Legacy save gains default campaign progress on load");
         v.Gold += 10; SaveStore.Save(path, v);
         Check(File.Exists(path + ".bak"), "Atomic replacement creates backup");
         File.WriteAllText(path, "corrupt fixture");
@@ -161,6 +167,13 @@ internal static class CoreTests
         v.Version = 1; v.Buildings[1].X = 18; v.Buildings[1].Z = 16; rejected = false;
         try { SaveStore.Validate(v); } catch (InvalidDataException) { rejected = true; }
         Check(rejected, "Reject overlapping persisted buildings");
+    }
+    private static string WithoutElement(string xml, string name)
+    {
+        string opening = "<" + name + ">", closing = "</" + name + ">";
+        int start = xml.IndexOf(opening, StringComparison.Ordinal), end = xml.IndexOf(closing, StringComparison.Ordinal);
+        if (start < 0 || end < start) return xml;
+        return xml.Remove(start, end + closing.Length - start);
     }
     private static void Combat()
     {
@@ -225,7 +238,8 @@ internal static class CoreTests
     }
     private static void MissionsCheck()
     {
-        for (int m = 0; m < 3; m++)
+        Check(Missions.Count == 10 && Missions.Descriptions.Length == Missions.Count, "Campaign exposes ten named original missions");
+        for (int m = 0; m < Missions.Count; m++)
         {
             List<Building> map = Missions.Create(m);
             HashSet<int> occupied = new HashSet<int>(); bool overlaps = false;
@@ -241,7 +255,32 @@ internal static class CoreTests
             { if (i == 250 || i == 550) battle.CastHeal(17000, 19000); battle.Step(); }
             Check(battle.Finished, "Mission " + m + " reaches result screen");
             Console.WriteLine("  Mission " + m + ": " + battle.Destruction + "% / " + battle.Stars + " stars / " + battle.AliveCount + " alive");
-            if (m == 0) Check(battle.Stars > 0, "Intro mission can be won with the supplied army");
+            Check(battle.Stars > 0, "Mission " + m + " can be won with the supplied army");
         }
+    }
+    private static void Progression()
+    {
+        GameSession session = NewSession();
+        Check(session.Village.CampaignStars.Count == Missions.Count && session.Village.UnlockedMissionCount == 1, "Fresh village starts with one unlocked campaign mission");
+        session.MissionIndex = 1; session.BeginBattle();
+        Check(session.Battle == null, "Locked campaign mission cannot start");
+        session.MissionIndex = 0; session.BeginBattle();
+        foreach (Building building in session.Battle.Buildings) if (building.Kind != BuildingKind.Wall) building.Health = 0;
+        session.Battle.Finish();
+        Check(session.Settle(), "Campaign battle settles into persistent progress");
+        Check(session.Village.CampaignStars[0] == 3 && session.Village.CampaignBest[0] == 100 && session.Village.UnlockedMissionCount == 2, "Victory record unlocks the next mission");
+        int gold = session.Village.Gold, crystal = session.Village.Crystal;
+        Check(session.ClaimAchievement("first_victory"), "Completed achievement reward can be claimed");
+        Check(session.Village.Gold == gold + 260 && session.Village.Crystal == crystal + 80, "Achievement grants its exact reward");
+        Check(!session.ClaimAchievement("first_victory"), "Achievement reward cannot be claimed twice");
+        Check(!session.ClaimAchievement("ten_stars"), "Incomplete achievement cannot be claimed");
+        GameSession capped = NewSession(); capped.Village.Wins = 1; capped.Village.Gold = capped.Village.Capacity;
+        int cappedCrystal = capped.Village.Crystal;
+        Check(!capped.ClaimAchievement("first_victory") && !capped.Village.HasClaimed("first_victory") && capped.Village.Gold == capped.Village.Capacity && capped.Village.Crystal == cappedCrystal, "Full warehouse preserves unclaimed achievement reward");
+        capped.Village.Gold -= 260;
+        Check(capped.ClaimAchievement("first_victory") && capped.Village.HasClaimed("first_victory") && capped.Village.Gold == capped.Village.Capacity, "Achievement remains claimable after freeing warehouse space");
+        session.ReturnHome();
+        session.MissionIndex = 0; session.BeginBattle(); session.Battle.Finish(); session.Settle();
+        Check(session.Village.CampaignStars[0] == 3 && session.Village.CampaignBest[0] == 100, "Lower replay result cannot erase a campaign record");
     }
 }

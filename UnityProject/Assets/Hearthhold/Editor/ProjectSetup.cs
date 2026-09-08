@@ -53,7 +53,7 @@ namespace Hearthhold.Editor
             }
             PlayerSettings.companyName = "Hearthhold Studio";
             PlayerSettings.productName = "Hearthhold";
-            PlayerSettings.bundleVersion = "0.4.0-preview";
+            PlayerSettings.bundleVersion = "0.5.0-preview";
             PlayerSettings.defaultScreenWidth = 1440;
             PlayerSettings.defaultScreenHeight = 900;
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;

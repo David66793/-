@@ -24,6 +24,36 @@ namespace Hearthhold.Core
         public string Description, Tactics, Weakness;
     }
 
+    public sealed class AchievementSpec
+    {
+        public string Id, Name, Description;
+        public int Target, GoldReward, CrystalReward;
+        public AchievementSpec(string id, string name, string description, int target, int goldReward, int crystalReward)
+        { Id = id; Name = name; Description = description; Target = target; GoldReward = goldReward; CrystalReward = crystalReward; }
+    }
+
+    public static class Achievements
+    {
+        public static readonly AchievementSpec[] Specs = {
+            new AchievementSpec("builder", "营火初盛", "聚落拥有18座建筑", 18, 220, 40),
+            new AchievementSpec("keep_two", "石垒新城", "将议事堡升到2级", 2, 320, 90),
+            new AchievementSpec("first_victory", "远征初捷", "赢得1次远征", 1, 260, 80),
+            new AchievementSpec("ten_stars", "星火征途", "战役累计获得10颗星", 10, 520, 160),
+            new AchievementSpec("five_missions", "开疆五站", "攻克5个不同关卡", 5, 760, 240)
+        };
+        public static AchievementSpec Find(string id)
+        { foreach (AchievementSpec spec in Specs) if (spec.Id == id) return spec; return null; }
+        public static int Progress(VillageData village, AchievementSpec spec)
+        {
+            if (spec.Id == "builder") return village.Buildings.Count;
+            if (spec.Id == "keep_two") return village.KeepLevel;
+            if (spec.Id == "first_victory") return village.Wins;
+            if (spec.Id == "ten_stars") return village.TotalStars;
+            if (spec.Id == "five_missions") return village.CompletedMissions;
+            return 0;
+        }
+    }
+
     public static class Rules
     {
         public const int MapSize = 40;
@@ -122,6 +152,9 @@ namespace Hearthhold.Core
         public int Version = 1, Gold = 1600, Crystal = 700, NextId = 1, Wins;
         public long LastIncomeUtcTicks;
         public List<Building> Buildings = new List<Building>();
+        public List<int> CampaignStars = new List<int>();
+        public List<int> CampaignBest = new List<int>();
+        public List<string> ClaimedAchievements = new List<string>();
         public static VillageData Create()
         {
             VillageData v = new VillageData();
@@ -134,6 +167,7 @@ namespace Hearthhold.Core
             v.Add(BuildingKind.Cannon, 15, 15);
             v.Add(BuildingKind.Watchtower, 23, 24);
             for (int x = 15; x <= 24; x++) v.Add(BuildingKind.Wall, x, 21);
+            v.EnsureProgress();
             return v;
         }
         public Building Add(BuildingKind kind, int x, int z)
@@ -153,6 +187,36 @@ namespace Hearthhold.Core
         public int Count(BuildingKind kind) { int count = 0; foreach (Building b in Buildings) if (b.Kind == kind) count++; return count; }
         public int Limit(BuildingKind kind) { return Rules.BuildLimit(kind, KeepLevel); }
         public bool AtLimit(BuildingKind kind) { return Count(kind) >= Limit(kind); }
+        [XmlIgnore] public int TotalStars { get { EnsureProgress(); int total = 0; foreach (int stars in CampaignStars) total += stars; return total; } }
+        [XmlIgnore] public int CompletedMissions { get { EnsureProgress(); int count = 0; foreach (int stars in CampaignStars) if (stars > 0) count++; return count; } }
+        [XmlIgnore] public int UnlockedMissionCount
+        {
+            get
+            {
+                EnsureProgress(); int count = 1;
+                while (count < Missions.Count && CampaignStars[count - 1] > 0) count++;
+                return count;
+            }
+        }
+        public void EnsureProgress()
+        {
+            if (CampaignStars == null) CampaignStars = new List<int>();
+            if (CampaignBest == null) CampaignBest = new List<int>();
+            if (ClaimedAchievements == null) ClaimedAchievements = new List<string>();
+            while (CampaignStars.Count < Missions.Count) CampaignStars.Add(0);
+            while (CampaignBest.Count < Missions.Count) CampaignBest.Add(0);
+        }
+        public bool IsMissionUnlocked(int mission) { return mission >= 0 && mission < UnlockedMissionCount; }
+        public bool RecordMission(int mission, int stars, int destruction)
+        {
+            EnsureProgress();
+            if (mission < 0 || mission >= Missions.Count) return false;
+            int oldStars = CampaignStars[mission], oldBest = CampaignBest[mission];
+            CampaignStars[mission] = Math.Max(oldStars, Math.Max(0, Math.Min(3, stars)));
+            CampaignBest[mission] = Math.Max(oldBest, Math.Max(0, Math.Min(100, destruction)));
+            return CampaignStars[mission] != oldStars || CampaignBest[mission] != oldBest;
+        }
+        public bool HasClaimed(string achievementId) { return ClaimedAchievements != null && ClaimedAchievements.Contains(achievementId); }
         public bool CanPlace(BuildingKind kind, int x, int z, int ignoreId)
         {
             int size = Rules.Spec(kind).Size;
@@ -165,26 +229,58 @@ namespace Hearthhold.Core
 
     public static class Missions
     {
-        public static readonly string[] Names = { "松林前哨", "河谷营地", "灰岩要塞" };
+        public static readonly string[] Names = { "松林前哨", "河谷营地", "灰岩要塞", "双桥关", "霜木环堡", "赤土兵站", "风暴高台", "月湾城寨", "黑松迷阵", "晨火王庭" };
+        public static readonly string[] Descriptions = {
+            "西侧栅线留有缺口，适合练习首次投兵。", "单一缺口由双重弩火覆盖，需要铁卫先行。", "完整外墙考验破城手与后排配合。", "横向隔墙把守军分成两个庭院。", "纵向隔墙迫使部队选择突破方向。", "十字内墙和更多资源点延长清扫路线。", "内外双环保护核心，先集中打开一侧。", "双营地与多座防御塔组成持久战。", "多重隔墙考验剩余兵力和治疗时机。", "三级王庭是当前战役终点，集中火力突破内环。"
+        };
+        public static int Count { get { return Names.Length; } }
         public static List<Building> Create(int index)
         {
+            if (index < 0 || index >= Count) throw new ArgumentOutOfRangeException("index");
             VillageData v = new VillageData();
-            v.Add(BuildingKind.Keep, 18, 18);
-            v.Add(BuildingKind.Mine, 15, 14);
-            v.Add(BuildingKind.Reservoir, 23, 20);
-            v.Add(BuildingKind.Barracks, 17, 25);
-            v.Add(BuildingKind.Cannon, 14, 20);
-            v.Add(BuildingKind.Watchtower, 24, 15);
-            for (int x = 12; x <= 27; x++) { v.Add(BuildingKind.Wall, x, 12); v.Add(BuildingKind.Wall, x, 29); }
-            for (int z = 13; z <= 28; z++) { v.Add(BuildingKind.Wall, 12, z); v.Add(BuildingKind.Wall, 27, z); }
-            if (index >= 1) { v.Add(BuildingKind.Cannon, 22, 25); v.Add(BuildingKind.Watchtower, 20, 14); }
-            if (index >= 2)
+            int level = Math.Min(3, 1 + index / 4);
+            Add(v, BuildingKind.Keep, 18, 18, level);
+            Add(v, BuildingKind.Mine, 14, 14, level);
+            Add(v, BuildingKind.Reservoir, 24, 19, level);
+            Add(v, BuildingKind.Barracks, 17, 24, level);
+            Add(v, BuildingKind.Cannon, 14, 20, level);
+            Add(v, BuildingKind.Watchtower, 24, 15, level);
+            if (index >= 1) Add(v, BuildingKind.Cannon, 22, 24, level);
+            if (index >= 2) Add(v, BuildingKind.Watchtower, 27, 21, level);
+            if (index >= 3) Add(v, BuildingKind.Mine, 24, 25, level);
+            if (index >= 4) Add(v, BuildingKind.Reservoir, 13, 24, level);
+            if (index >= 5) Add(v, BuildingKind.Cannon, 20, 27, level);
+            if (index >= 6) Add(v, BuildingKind.Watchtower, 17, 14, level);
+            if (index >= 7) Add(v, BuildingKind.Barracks, 25, 12, level);
+            if (index >= 8) Add(v, BuildingKind.Cannon, 27, 17, level);
+            if (index >= 9) Add(v, BuildingKind.Watchtower, 12, 18, level);
+
+            for (int x = 11; x <= 29; x++) { Wall(v, x, 11, level); Wall(v, x, 30, level); }
+            for (int z = 12; z <= 29; z++)
             {
-                v.Add(BuildingKind.Cannon, 23, 18);
-                for (int z = 17; z < 25; z++) v.Add(BuildingKind.Wall, 22, z);
-                foreach (Building b in v.Buildings) { b.Level = 2; b.Health = b.MaxHealth; }
+                if (!((index == 0 && z >= 18 && z <= 22) || (index == 1 && z == 20))) Wall(v, 11, z, level);
+                Wall(v, 29, z, level);
             }
+            if (index == 3 || index == 5 || index == 9) for (int x = 13; x <= 27; x++) Wall(v, x, 23, level);
+            if (index == 4 || index == 5 || index == 8 || index == 9) for (int z = 13; z <= 28; z++) Wall(v, 21, z, level);
+            if (index == 6 || index == 9)
+            {
+                for (int x = 16; x <= 24; x++) { Wall(v, x, 16, level); Wall(v, x, 25, level); }
+                for (int z = 17; z <= 24; z++) { Wall(v, 16, z, level); Wall(v, 24, z, level); }
+            }
+            if (index == 7 || index == 8)
+                for (int z = 13; z <= 28; z++) { if (z != 19) Wall(v, 17, z, level); if (z != 24) Wall(v, 23, z, level); }
             return v.Buildings;
+        }
+        private static void Add(VillageData village, BuildingKind kind, int x, int z, int level)
+        {
+            if (!village.CanPlace(kind, x, z, -1)) throw new InvalidOperationException("Mission layout overlap: " + kind + " at " + x + "," + z);
+            Building building = village.Add(kind, x, z); building.Level = level; building.Health = building.MaxHealth;
+        }
+        private static void Wall(VillageData village, int x, int z, int level)
+        {
+            if (!village.CanPlace(BuildingKind.Wall, x, z, -1)) return;
+            Building wall = village.Add(BuildingKind.Wall, x, z); wall.Level = level; wall.Health = wall.MaxHealth;
         }
     }
 }

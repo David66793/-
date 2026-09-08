@@ -201,7 +201,8 @@ namespace Hearthhold.UnityClient
 
         private void PrepareBattleSmoke()
         {
-            session.MissionIndex = 0;
+            for (int i = 0; i < Missions.Count - 1; i++) session.Village.RecordMission(i, 1, 55 + i * 3);
+            session.MissionIndex = Missions.Count - 1;
             session.BeginBattle();
             if (session.Battle == null) return;
             showBrief = false; briefSeen = true;
@@ -212,14 +213,25 @@ namespace Hearthhold.UnityClient
             for (int i = 0; i < 5; i++) session.Battle.Deploy(TroopKind.Vanguard, 9000, 17500 + i * 1200);
             for (int i = 0; i < 5; i++) session.Battle.Deploy(TroopKind.Ranger, 7500, 17000 + i * 1400);
             for (int i = 0; i < 240 && !session.Battle.Finished; i++) session.Battle.Step();
-            session.Notice = "0.4 战斗表现验收：弹道、受击、血条与部署边界。";
+            session.Notice = "0.5 最终关卡验收：三级王庭、内墙、弹道与战斗状态。";
+        }
+
+        private void PrepareCampaignSmoke()
+        {
+            session.Village.RecordMission(0, 3, 100);
+            session.Village.RecordMission(1, 2, 78);
+            session.Village.RecordMission(2, 1, 56);
+            session.Village.Wins = 3;
+            session.MissionIndex = 3;
+            selected = -1; showCampaign = true;
+            session.Notice = "0.5 战役进度验收：逐关解锁、最佳纪录与成就奖励。";
         }
 
         private void PrepareHomeSmoke()
         {
             foreach (Building building in session.Village.Buildings)
                 if (building.Kind == BuildingKind.Keep) { selected = building.Id; break; }
-            session.Notice = "0.4 聚落表现验收：建筑选中圈、立体光照与建造信息。";
+            session.Notice = "0.5 聚落验收：旧存档兼容、战役入口与建造信息。";
         }
 
         private void DisposePresentation()

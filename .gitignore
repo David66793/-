@@ -18,6 +18,9 @@ artifacts/screenshots/*
 !artifacts/screenshots/18-unity-home.png
 !artifacts/screenshots/20-unity-home-v04.png
 !artifacts/screenshots/21-unity-battle-v04.png
+!artifacts/screenshots/23-unity-home-v05.png
+!artifacts/screenshots/24-unity-campaign-v05.png
+!artifacts/screenshots/25-unity-final-mission-v05.png
 Saves/
 **/Saves/
 *.exe
