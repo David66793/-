@@ -1,8 +1,8 @@
 # 篝火堡垒 · Hearthhold
 
-Windows PC 原型，版本 0.2.0。原创的建造与异步攻城方向项目。
+Windows PC 原型，版本 0.3.0-preview。原创的建造与异步攻城方向项目。
 
-当前交付的是一个可直接运行的离线 Windows 试玩程序，以及共享相同 C# 规则、战斗逻辑和模型几何的 Unity 工程。试玩程序用 WinForms/GDI+ 将模型绘制为等距画面；Unity 客户端把同一份几何转为 URP 三维网格。两者的渲染实现不同，Unity 端尚未实际编译验证。
+当前交付包括一个轻量的 Windows 原生试玩程序，以及共享相同 C# 规则、战斗逻辑和模型几何的 Unity 3D Windows 试玩版。原生程序用 WinForms/GDI+ 绘制等距画面；Unity 客户端把同一份几何转为 URP 三维网格。Unity 端已完成首次导入、脚本编译、Windows x64 构建和实际画面烟雾测试。
 
 ## 本地构建与试玩
 
@@ -14,12 +14,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-preview.ps1 -T
 
 随后双击 `artifacts/WindowsPreview/Hearthhold.exe`，或解压 `artifacts/Hearthhold-0.2.0-win-x64.zip`。运行环境为 Windows x64 和 .NET Framework 4.x；本机已完成编译和交互验证，无需 Unity 或 .NET SDK。
 
+Unity 3D 版使用 Unity `6000.6.0f1` 构建：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-unity.ps1 -Action Build -Package
+```
+
+构建后运行 `artifacts/WindowsUnity/Hearthhold.exe`，发布包为 `artifacts/Hearthhold-0.3.0-unity-win-x64.zip`。首次构建需要已安装、登录并激活的 Unity 编辑器；发布包运行时不需要安装 Unity。
+
 第一次进入时，已有一座主城、两座金矿、一座晶露池、一座远征营、两座防御建筑和一段城墙，初始资源足够体验建造与升级。可以先收取产出、摆放建筑，再点右下角“出发远征”。
 
-![基地画面](artifacts/screenshots/01-home.png)
+![Unity 3D 基地画面](artifacts/screenshots/18-unity-home.png)
 
 ## 本轮更新
 
+- Unity 工程已升级并锁定为 Unity 6000.6.0f1 / URP 17.6.0，生成完整项目设置、资源 `.meta`、主场景和包锁文件；Windows x64 构建已实际成功。
 - 重做 7 类建筑、1—3 级外观和 4 类兵种：加入屋瓦、拱门、砖石接缝、金矿道具、晶簇、武器与护甲，建筑卡片和兵种图鉴使用对应模型。
 - 选中建筑后按 Delete 或点击“拆除建筑”，确认后拆除并返还建设、历次升级投入的 50%。议事堡不可拆；返还受仓储上限限制；拆除不可撤销。
 - 建造卡片显示“已建 / 上限”。上限随议事堡升级增加，拆除释放名额，移动不消耗名额。
@@ -96,21 +105,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-preview.ps1 -T
 
 ## Unity 工程
 
-路径：`UnityProject`。工程基线版本为 Unity `6000.3.10f1` / URP `17.3.0`，不是对“最新版本”的声明。
+路径：`UnityProject`。工程基线已更新为本机实际安装的 Unity `6000.6.0f1` / URP `17.6.0`。
 
-1. 在 Unity Hub 中添加 `UnityProject`，使用兼容的 Unity 6.3 编辑器打开。若要升级补丁版本，保留工程备份后验证。
+1. 在 Unity Hub 中添加 `UnityProject`，使用 Unity 6.6 编辑器打开。若要升级版本，先提交当前工程并验证包兼容性。
 2. 首次打开会从 Unity Package Manager 获取 URP，并编译脚本。
 3. 编辑器脚本自动创建 URP 配置、基础材质和 `Assets/Hearthhold/Scenes/Main.unity`。
 4. 选择菜单 `Hearthhold > Open main scene`，点击 Play。场景和游戏对象在运行时生成，编辑模式的初始场景为空是预期行为。
 5. 选择 `Hearthhold > Build Windows x64`，构建到 `artifacts/WindowsUnity`。
 
-**当前机器已安装 Unity Hub 3.21.0，但没有 Unity 编辑器，因此 Unity 客户端、URP 首次导入和 Windows Unity 构建尚未实际编译/运行。** 已验证的可执行文件是上面的 Windows 原生试玩版，不能将其视为 Unity 构建成功的证据。
+**当前机器已使用 Unity 6000.6.0f1 / URP 17.6.0 实际完成 Windows x64 构建。** 构建日志包含 `Build Finished, Result: Success` 和本轮输出路径标记；运行时烟雾测试以独立测试存档启动程序、渲染 1440×900 画面并以退出码 0 结束。
 
-Unity 客户端目前是共享逻辑的 3D 接入起点：代码已接入新版网格、顶点色光照材质、拆除确认、建造上限、兵种图鉴和首次出征引导，尚未验证与原生试玩的视觉、输入功能一致性。2026-09-06 尝试从基线版本官方发布页下载安装器时，当前网络跳转至返回 404 的区域镜像，因此未取得编辑器。
+Unity 客户端已接入新版网格、顶点色光照材质、拆除确认、建造上限、兵种图鉴和首次出征引导。自动构建与首页渲染已经验证；完整人工操作流程、三场远征的 Unity 界面回归和持续性能测试仍待完成，不能把首页烟雾测试视为全部玩法验收。
 
 2026-09-06 环境推进：默认官方下载入口实际返回 Hub 3.3.6，安装后其列表只包含 2020—2022 系列编辑器；随后使用官方指定版本入口取得 Hub 3.21.0，并成功升级到 `C:\Program Files\Unity Hub\Unity Hub.exe`。新安装器为 `artifacts/Installers/UnityHubSetup-3.21.0-x64.exe`，数字签名验证通过，签名主体为 Unity Technologies SF。安装器不包含在 0.2 试玩压缩包中。
 
-当前自动启动 Hub 时，在写入用户配置 `user-settings.json` 的原子重命名步骤报告 `EXDEV: cross-device link not permitted`；已批准的沙箱外启动也未解决。未修改 Hub 程序、未清空个人配置、未调整系统权限，也未替用户登录或激活许可证。下一步请从开始菜单手动打开 Hub，确认能否正常进入登录界面；正常后完成本人登录与适用许可证激活，再安装工程对应的编辑器。未降低工程或 URP 版本。
+Unity Hub 的命令行曾遇到用户配置原子重命名错误，但用户通过 Hub 完成编辑器安装和许可证准备后，编辑器批处理构建与运行不受该问题影响。
 
 已添加 `tools/build-unity.ps1`：
 
@@ -122,7 +131,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-unity.ps1 -Act
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-unity.ps1 -Action Build
 ```
 
-自定义安装位置可增加 `-EditorPath "E:\你的安装位置\Editor\Unity.exe"`。脚本校验工程要求与编辑器版本，不自动升级/降级；日志分别保存在 `artifacts/UnityLogs`，构建后检查完整产物与本轮日志成功标记，避免把旧文件当成新构建成功。脚本语法、当前缺编辑器诊断和缺编辑器拒绝构建已验证；实际 Unity 启动、导入、编译、材质和运行仍待验证。
+自定义安装位置可增加 `-EditorPath "E:\你的安装位置\Editor\Unity.exe"`。脚本校验工程要求与编辑器版本，不自动升级/降级；日志分别保存在 `artifacts/UnityLogs`，构建后检查完整产物与本轮日志成功标记，避免把旧文件当成新构建成功。`-Package` 会排除 Unity 明确标记为不可发布的备份目录，再生成 Windows 发布包。
 
 Unity 客户端使用旧版 `Input` API。如果打开工程后出现输入后端异常，在 Player Settings 的 Active Input Handling 中选择 Input Manager (Old) 或 Both。编辑器首次准备脚本会在可访问相应设置时配置它。
 

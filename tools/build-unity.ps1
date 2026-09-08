@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Check', 'Prepare', 'Build')][string]$Action = 'Check',
-    [string]$EditorPath = ''
+    [string]$EditorPath = '',
+    [switch]$Package
 )
 $ErrorActionPreference = 'Stop'
 $taskRoot = Split-Path -Parent $PSScriptRoot
@@ -73,6 +74,16 @@ if ($Action -eq 'Build') {
     if (-not (Select-String -LiteralPath $taskLog -Pattern 'Windows build ready:' -SimpleMatch -Quiet)) { throw ('The current log has no build success marker. Old build files are not proof of success: ' + $taskLog) }
     Write-Output ('Windows Unity build produced: ' + $taskPlayer)
     Write-Output 'Build completed; runtime gameplay and visual verification are still required.'
+    if ($Package) {
+        $taskReleaseReadme = Join-Path $taskRoot 'release\UNITY-README.txt'
+        if (-not (Test-Path -LiteralPath $taskReleaseReadme -PathType Leaf)) { throw ('Unity release guide is missing: ' + $taskReleaseReadme) }
+        $taskPackage = Join-Path $taskRoot 'artifacts\Hearthhold-0.3.0-unity-win-x64.zip'
+        $taskPackageInputs = @(Get-ChildItem -LiteralPath (Split-Path -Parent $taskPlayer) | Where-Object Name -ne 'Hearthhold_BackUpThisFolder_ButDontShipItWithYourGame' | ForEach-Object FullName)
+        $taskPackageInputs += $taskReleaseReadme
+        Compress-Archive -LiteralPath $taskPackageInputs -DestinationPath $taskPackage -Force
+        Write-Output ('Packaged: ' + $taskPackage)
+        Get-FileHash -LiteralPath $taskPackage -Algorithm SHA256 | Select-Object Algorithm, Hash, Path
+    }
 } else {
     Write-Output 'Unity project preparation completed. This is not a Windows player build or a gameplay test.'
 }

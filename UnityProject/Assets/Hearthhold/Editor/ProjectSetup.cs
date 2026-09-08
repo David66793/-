@@ -53,6 +53,7 @@ namespace Hearthhold.Editor
             }
             PlayerSettings.companyName = "Hearthhold Studio";
             PlayerSettings.productName = "Hearthhold";
+            PlayerSettings.bundleVersion = "0.3.0-preview";
             PlayerSettings.defaultScreenWidth = 1440;
             PlayerSettings.defaultScreenHeight = 900;
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
@@ -68,10 +69,15 @@ namespace Hearthhold.Editor
             }
             if (!File.Exists("Assets/Hearthhold/Scenes/Main.unity"))
             {
-                // Do not replace an existing user's scene. Save and close a separate additive scene.
-                var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+                // Batch mode starts with an unsaved, empty scene and Unity 6.6 refuses to
+                // create an additive scene beside it. Reuse that scene when possible.
+                var scene = EditorSceneManager.GetActiveScene();
+                if (!scene.IsValid() || !string.IsNullOrEmpty(scene.path) || scene.rootCount > 0)
+                {
+                    if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+                    scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                }
                 EditorSceneManager.SaveScene(scene, "Assets/Hearthhold/Scenes/Main.unity");
-                EditorSceneManager.CloseScene(scene, true);
             }
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Hearthhold/Scenes/Main.unity", true) };
             AssetDatabase.SaveAssets();

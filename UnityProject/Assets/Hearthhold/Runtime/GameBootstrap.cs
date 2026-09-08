@@ -16,7 +16,8 @@ namespace Hearthhold.UnityClient
         private readonly Dictionary<int, GameObject> buildingViews = new Dictionary<int, GameObject>();
         private readonly Dictionary<int, GameObject> unitViews = new Dictionary<int, GameObject>();
         private readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>();
-        private string savePath, fatalError;
+        private string savePath, fatalError, smokeCapturePath;
+        private int smokeFrames;
         private int selected = -1, moving = -1;
         private BuildingKind? buildKind;
         private TroopKind troop;
@@ -32,12 +33,20 @@ namespace Hearthhold.UnityClient
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Launch()
         {
-            if (FindFirstObjectByType<GameBootstrap>() == null) new GameObject("Hearthhold game").AddComponent<GameBootstrap>();
+            if (FindAnyObjectByType<GameBootstrap>() == null) new GameObject("Hearthhold game").AddComponent<GameBootstrap>();
         }
         private void Awake()
         {
             Application.targetFrameRate = 60;
-            savePath = Path.Combine(Application.persistentDataPath, "village.xml");
+            smokeCapturePath = CommandLineValue("-hearthhold-smoke");
+            if (!string.IsNullOrEmpty(smokeCapturePath))
+            {
+                Application.runInBackground = true;
+                smokeCapturePath = Path.GetFullPath(smokeCapturePath);
+                Directory.CreateDirectory(Path.GetDirectoryName(smokeCapturePath));
+                savePath = Path.Combine(Path.GetDirectoryName(smokeCapturePath), "smoke-village.xml");
+            }
+            else savePath = Path.Combine(Application.persistentDataPath, "village.xml");
             try
             {
                 string message;
@@ -66,6 +75,33 @@ namespace Hearthhold.UnityClient
             placement = Piece("Placement", PrimitiveType.Cube, Vector3.zero, new Vector3(1, 0.07f, 1), Mint, transform);
             placement.SetActive(false);
             uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei UI", "Microsoft YaHei", "Arial" }, 16);
+        }
+        private static string CommandLineValue(string name)
+        {
+            string[] arguments = Environment.GetCommandLineArgs();
+            for (int i = 0; i + 1 < arguments.Length; i++) if (string.Equals(arguments[i], name, StringComparison.OrdinalIgnoreCase)) return arguments[i + 1];
+            return null;
+        }
+        private void LateUpdate()
+        {
+            if (string.IsNullOrEmpty(smokeCapturePath)) return;
+            smokeFrames++;
+            if (smokeFrames == 20)
+            {
+                ScreenCapture.CaptureScreenshot(smokeCapturePath);
+                Debug.Log("HEARTHHOLD_SMOKE_CAPTURE_REQUESTED: " + smokeCapturePath);
+            }
+            if (smokeFrames > 20 && File.Exists(smokeCapturePath) && new FileInfo(smokeCapturePath).Length > 1024)
+            {
+                Debug.Log("HEARTHHOLD_SMOKE_READY: " + smokeCapturePath);
+                smokeCapturePath = null;
+                Application.Quit(0);
+            }
+            else if (smokeFrames > 600)
+            {
+                Debug.LogError("HEARTHHOLD_SMOKE_TIMEOUT: screenshot was not written.");
+                Application.Quit(3);
+            }
         }
         private Material MaterialFor(Color color)
         {
