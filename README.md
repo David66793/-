@@ -1,6 +1,6 @@
 # 篝火堡垒 · Hearthhold
 
-Windows PC 原型，版本 0.3.0-preview。原创的建造与异步攻城方向项目。
+Windows PC 原型，版本 0.4.0-preview。原创的建造与异步攻城方向项目。
 
 当前交付包括一个轻量的 Windows 原生试玩程序，以及共享相同 C# 规则、战斗逻辑和模型几何的 Unity 3D Windows 试玩版。原生程序用 WinForms/GDI+ 绘制等距画面；Unity 客户端把同一份几何转为 URP 三维网格。Unity 端已完成首次导入、脚本编译、Windows x64 构建和实际画面烟雾测试。
 
@@ -20,14 +20,17 @@ Unity 3D 版使用 Unity `6000.6.0f1` 构建：
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-unity.ps1 -Action Build -Package
 ```
 
-构建后运行 `artifacts/WindowsUnity/Hearthhold.exe`，发布包为 `artifacts/Hearthhold-0.3.0-unity-win-x64.zip`。首次构建需要已安装、登录并激活的 Unity 编辑器；发布包运行时不需要安装 Unity。
+构建后运行 `artifacts/WindowsUnity/Hearthhold.exe`，发布包为 `artifacts/Hearthhold-0.4.0-unity-win-x64.zip`。首次构建需要已安装、登录并激活的 Unity 编辑器；发布包运行时不需要安装 Unity。
 
 第一次进入时，已有一座主城、两座金矿、一座晶露池、一座远征营、两座防御建筑和一段城墙，初始资源足够体验建造与升级。可以先收取产出、摆放建筑，再点右下角“出发远征”。
 
-![Unity 3D 基地画面](artifacts/screenshots/18-unity-home.png)
+![Unity 3D 基地画面](artifacts/screenshots/20-unity-home-v04.png)
 
 ## 本轮更新
 
+- 0.4 强化 Unity 表现层：建筑选中圆环、带模型的建造/移动预览、橙色投兵边界和平滑兵种移动。
+- 远征加入三维远程弹道、近战冲击圈、治疗范围圈、受击闪光与建筑摧毁碎片；血条会按健康、受伤、濒危变色。
+- 战斗信息显示存活与待命人数，地图投兵提示增加高对比底板；新增首页和交战阶段两套成品烟雾测试。
 - Unity 工程已升级并锁定为 Unity 6000.6.0f1 / URP 17.6.0，生成完整项目设置、资源 `.meta`、主场景和包锁文件；Windows x64 构建已实际成功。
 - 重做 7 类建筑、1—3 级外观和 4 类兵种：加入屋瓦、拱门、砖石接缝、金矿道具、晶簇、武器与护甲，建筑卡片和兵种图鉴使用对应模型。
 - 选中建筑后按 Delete 或点击“拆除建筑”，确认后拆除并返还建设、历次升级投入的 50%。议事堡不可拆；返还受仓储上限限制；拆除不可撤销。
@@ -113,9 +116,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-preview.ps1 -T
 4. 选择菜单 `Hearthhold > Open main scene`，点击 Play。场景和游戏对象在运行时生成，编辑模式的初始场景为空是预期行为。
 5. 选择 `Hearthhold > Build Windows x64`，构建到 `artifacts/WindowsUnity`。
 
-**当前机器已使用 Unity 6000.6.0f1 / URP 17.6.0 实际完成 Windows x64 构建。** 构建日志包含 `Build Finished, Result: Success` 和本轮输出路径标记；运行时烟雾测试以独立测试存档启动程序、渲染 1440×900 画面并以退出码 0 结束。
+**当前机器已使用 Unity 6000.6.0f1 / URP 17.6.0 实际完成 Windows x64 构建。** 构建日志包含 `Build Finished, Result: Success` 和本轮输出路径标记；运行时双场景烟雾测试以独立测试存档启动程序，分别渲染 1440×900 聚落与交战画面并以退出码 0 结束。
 
-Unity 客户端已接入新版网格、顶点色光照材质、拆除确认、建造上限、兵种图鉴和首次出征引导。自动构建与首页渲染已经验证；完整人工操作流程、三场远征的 Unity 界面回归和持续性能测试仍待完成，不能把首页烟雾测试视为全部玩法验收。
+Unity 客户端已接入新版网格、顶点色光照材质、拆除确认、建造上限、兵种图鉴和首次出征引导。自动构建、聚落与交战渲染已经验证；三场远征逐关人工验收和持续性能测试仍待完成，不能把烟雾测试视为全部玩法验收。
+
+![Unity 0.4 战斗表现](artifacts/screenshots/21-unity-battle-v04.png)
 
 2026-09-06 环境推进：默认官方下载入口实际返回 Hub 3.3.6，安装后其列表只包含 2020—2022 系列编辑器；随后使用官方指定版本入口取得 Hub 3.21.0，并成功升级到 `C:\Program Files\Unity Hub\Unity Hub.exe`。新安装器为 `artifacts/Installers/UnityHubSetup-3.21.0-x64.exe`，数字签名验证通过，签名主体为 Unity Technologies SF。安装器不包含在 0.2 试玩压缩包中。
 
@@ -129,6 +134,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-unity.ps1 -Act
 # 编辑器安装并激活后，准备工程或构建 Windows 版
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-unity.ps1 -Action Prepare
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\build-unity.ps1 -Action Build
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-unity-player.ps1 -Case All
 ```
 
 自定义安装位置可增加 `-EditorPath "E:\你的安装位置\Editor\Unity.exe"`。脚本校验工程要求与编辑器版本，不自动升级/降级；日志分别保存在 `artifacts/UnityLogs`，构建后检查完整产物与本轮日志成功标记，避免把旧文件当成新构建成功。`-Package` 会排除 Unity 明确标记为不可发布的备份目录，再生成 Windows 发布包。

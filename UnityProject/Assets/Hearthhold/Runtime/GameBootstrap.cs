@@ -17,6 +17,8 @@ namespace Hearthhold.UnityClient
         private readonly Dictionary<int, GameObject> unitViews = new Dictionary<int, GameObject>();
         private readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>();
         private string savePath, fatalError, smokeCapturePath;
+        private bool smokeBattle;
+        private DateTime smokeRequestedUtc;
         private int smokeFrames;
         private int selected = -1, moving = -1;
         private BuildingKind? buildKind;
@@ -39,18 +41,19 @@ namespace Hearthhold.UnityClient
         {
             Application.targetFrameRate = 60;
             smokeCapturePath = CommandLineValue("-hearthhold-smoke");
+            smokeBattle = HasCommandLineFlag("-hearthhold-smoke-battle");
             if (!string.IsNullOrEmpty(smokeCapturePath))
             {
                 Application.runInBackground = true;
                 smokeCapturePath = Path.GetFullPath(smokeCapturePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(smokeCapturePath));
-                savePath = Path.Combine(Path.GetDirectoryName(smokeCapturePath), "smoke-village.xml");
+                savePath = Path.ChangeExtension(smokeCapturePath, ".village.xml");
             }
             else savePath = Path.Combine(Application.persistentDataPath, "village.xml");
             try
             {
-                string message;
-                session = new GameSession(SaveStore.Load(savePath, out message));
+                string message = "";
+                session = new GameSession(string.IsNullOrEmpty(smokeCapturePath) ? SaveStore.Load(savePath, out message) : VillageData.Create());
                 if (!string.IsNullOrEmpty(message)) session.Notice = message;
             }
             catch (Exception ex) { fatalError = ex.Message; return; }
@@ -71,9 +74,13 @@ namespace Hearthhold.UnityClient
             sun.transform.rotation = Quaternion.Euler(50, -35, 0);
             sun.shadows = LightShadows.Soft;
             RenderSettings.ambientLight = new Color(0.63f, 0.7f, 0.66f);
-            MakeIsland(); RebuildBuildings();
+            MakeIsland();
             placement = Piece("Placement", PrimitiveType.Cube, Vector3.zero, new Vector3(1, 0.07f, 1), Mint, transform);
             placement.SetActive(false);
+            InitializePresentation();
+            RebuildBuildings();
+            if (smokeBattle) PrepareBattleSmoke();
+            else if (!string.IsNullOrEmpty(smokeCapturePath)) PrepareHomeSmoke();
             uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei UI", "Microsoft YaHei", "Arial" }, 16);
         }
         private static string CommandLineValue(string name)
@@ -82,16 +89,23 @@ namespace Hearthhold.UnityClient
             for (int i = 0; i + 1 < arguments.Length; i++) if (string.Equals(arguments[i], name, StringComparison.OrdinalIgnoreCase)) return arguments[i + 1];
             return null;
         }
+        private static bool HasCommandLineFlag(string name)
+        {
+            foreach (string argument in Environment.GetCommandLineArgs()) if (string.Equals(argument, name, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
         private void LateUpdate()
         {
             if (string.IsNullOrEmpty(smokeCapturePath)) return;
             smokeFrames++;
-            if (smokeFrames == 20)
+            int captureFrame = smokeBattle ? 90 : 20;
+            if (smokeFrames == captureFrame)
             {
+                smokeRequestedUtc = DateTime.UtcNow;
                 ScreenCapture.CaptureScreenshot(smokeCapturePath);
                 Debug.Log("HEARTHHOLD_SMOKE_CAPTURE_REQUESTED: " + smokeCapturePath);
             }
-            if (smokeFrames > 20 && File.Exists(smokeCapturePath) && new FileInfo(smokeCapturePath).Length > 1024)
+            if (smokeFrames > captureFrame && File.Exists(smokeCapturePath) && new FileInfo(smokeCapturePath).Length > 1024 && File.GetLastWriteTimeUtc(smokeCapturePath) >= smokeRequestedUtc.AddSeconds(-1))
             {
                 Debug.Log("HEARTHHOLD_SMOKE_READY: " + smokeCapturePath);
                 smokeCapturePath = null;
@@ -157,6 +171,7 @@ namespace Hearthhold.UnityClient
         }
         private void RebuildBuildings()
         {
+            ResetBattlePresentation();
             foreach (GameObject obj in buildingViews.Values) DestroyBuildingView(obj);
             buildingViews.Clear();
             List<Building> buildings = session.Battle == null ? session.Village.Buildings : session.Battle.Buildings;
@@ -222,15 +237,15 @@ namespace Hearthhold.UnityClient
                 if (placement.activeSelf)
                 {
                     int size = Rules.Spec(placeKind.Value).Size;
-                    placement.transform.position = new Vector3(x + size / 2f, 0.1f, z + size / 2f);
-                    placement.transform.localScale = new Vector3(size, 0.08f, size);
-                    placement.GetComponent<Renderer>().sharedMaterial = MaterialFor(session.Village.CanPlace(placeKind.Value, x, z, moving) && (movingBuilding != null || !session.Village.AtLimit(placeKind.Value) && session.Village.Gold >= Rules.Spec(placeKind.Value).Cost) ? Mint : Color.red);
+                    bool valid = session.Village.CanPlace(placeKind.Value, x, z, moving) && (movingBuilding != null || !session.Village.AtLimit(placeKind.Value) && session.Village.Gold >= Rules.Spec(placeKind.Value).Cost);
+                    ShowPlacementPresentation(placeKind.Value, movingBuilding == null ? 1 : movingBuilding.Level, x, z, size, valid);
                 }
                 deployElapsed += dt;
                 bool repeat = Input.GetMouseButton(0) && deployElapsed > 0.15f && (session.Battle != null && !heal || placeKind == BuildingKind.Wall);
                 if (Input.GetMouseButtonDown(0) || repeat) { HandleMapClick(x, z); deployElapsed = 0; }
             }
-            else placement.SetActive(false);
+            else HidePlacementPresentation();
+            UpdateSelectionPresentation();
             saveElapsed += dt; if (saveElapsed >= 15) { Save(); saveElapsed = 0; }
         }
         private void MoveCamera() { worldCamera.transform.position = focus - worldCamera.transform.forward * 65; }
@@ -277,10 +292,15 @@ namespace Hearthhold.UnityClient
                 {
                     obj = modelViews.Troop(unit, unitsRoot);
                     unitViews.Add(unit.Id, obj);
+                    obj.transform.position = new Vector3(unit.X / 1000f, 0, unit.Z / 1000f);
                 }
                 obj.SetActive(unit.Health > 0);
-                obj.transform.position = new Vector3(unit.X / 1000f, 0, unit.Z / 1000f);
+                Vector3 desired = new Vector3(unit.X / 1000f, 0, unit.Z / 1000f);
+                Vector3 motion = desired - obj.transform.position;
+                obj.transform.position = Vector3.Lerp(obj.transform.position, desired, 1 - Mathf.Exp(-Time.deltaTime * 14));
+                if (motion.sqrMagnitude > 0.0001f) obj.transform.rotation = Quaternion.Slerp(obj.transform.rotation, Quaternion.LookRotation(motion), 1 - Mathf.Exp(-Time.deltaTime * 11));
             }
+            PresentBattleEffects();
         }
         private void Save()
         {
@@ -292,6 +312,7 @@ namespace Hearthhold.UnityClient
         private void OnDestroy()
         {
             modelViews.Dispose();
+            DisposePresentation();
             foreach (Material material in materials.Values) Destroy(material);
             if (sceneryRoot != null) foreach (MeshFilter filter in sceneryRoot.GetComponentsInChildren<MeshFilter>()) if (filter.sharedMesh != null && filter.sharedMesh.name == "Procedural cone") Destroy(filter.sharedMesh);
             foreach (GameObject obj in buildingViews.Values) if (obj != null) DestroyBuildingView(obj);
@@ -337,7 +358,8 @@ namespace Hearthhold.UnityClient
             {
                 Battle battle = session.Battle;
                 GUI.Label(new Rect(36, 131, 200, 35), Missions.Names[battle.Mission], heading);
-                GUI.Label(new Rect(36, 181, 200, 100), (battle.Started ? "战斗中" : "侦察中") + "\n剩余 " + battle.SecondsLeft + " 秒\n破坏率 " + battle.Destruction + "%  /  " + battle.Stars + " 星", label);
+                int reserves = 0; foreach (int count in battle.Available) reserves += count;
+                GUI.Label(new Rect(36, 176, 200, 130), (battle.Started ? "战斗中" : "侦察中") + "\n剩余 " + battle.SecondsLeft + " 秒\n破坏率 " + battle.Destruction + "%  /  " + battle.Stars + " 星\n存活 " + battle.AliveCount + "  ·  待命 " + reserves, label);
             }
             GUI.Label(new Rect(265, 108, Screen.width - 550, 55), session.Notice, small);
             if (selected >= 0 && session.Battle == null)
@@ -414,24 +436,13 @@ namespace Hearthhold.UnityClient
         private void DrawBattleOverlay()
         {
             if (session.Battle == null) return;
-            foreach (Building b in session.Battle.Buildings) if (b.Health > 0 && b.Health < b.MaxHealth) Bar(new Vector3(b.CenterX / 1000f, 3.5f, b.CenterZ / 1000f), b.Health / (float)b.MaxHealth, Gold);
-            foreach (Unit u in session.Battle.Units) if (u.Health > 0) Bar(new Vector3(u.X / 1000f, 2, u.Z / 1000f), u.Health / (float)u.Spec.Health, Mint);
-            foreach (CombatEffect fx in session.Battle.Effects)
-            {
-                Vector3 a = worldCamera.WorldToScreenPoint(new Vector3(fx.X / 1000f, 0.7f, fx.Z / 1000f));
-                Vector3 b = worldCamera.WorldToScreenPoint(new Vector3(fx.EndX / 1000f, 1.2f, fx.EndZ / 1000f));
-                if (fx.Kind < 2)
-                {
-                    Matrix4x4 old = GUI.matrix;
-                    Vector2 start = new Vector2(a.x, Screen.height - a.y), end = new Vector2(b.x, Screen.height - b.y), d = end - start;
-                    GUIUtility.RotateAroundPivot(Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg, start);
-                    GUI.color = Gold; GUI.DrawTexture(new Rect(start.x, start.y, d.magnitude, 2), Texture2D.whiteTexture); GUI.color = Color.white; GUI.matrix = old;
-                }
-            }
+            foreach (Building b in session.Battle.Buildings) if (b.Health > 0 && b.Health < b.MaxHealth) { float health = b.Health / (float)b.MaxHealth; Bar(new Vector3(b.CenterX / 1000f, 3.5f, b.CenterZ / 1000f), health, HealthColor(health)); }
+            foreach (Unit u in session.Battle.Units) if (u.Health > 0) { float health = u.Health / (float)u.Spec.Health; Bar(new Vector3(u.X / 1000f, 2, u.Z / 1000f), health, HealthColor(health)); }
             if (!session.Battle.Finished && GroundPoint(out Vector3 point))
             {
-                string prompt = heal ? "疗愈范围：5格" : session.Battle.CanDeploy(Mathf.FloorToInt(point.x) * 1000 + 500, Mathf.FloorToInt(point.z) * 1000 + 500) ? "可以投兵" : "请在基地外围投兵";
-                GUI.Label(new Rect(Input.mousePosition.x + 18, Screen.height - Input.mousePosition.y + 18, 190, 35), prompt, small);
+                string prompt = heal ? "疗愈范围：5格" : session.Battle.CanDeploy(Mathf.FloorToInt(point.x) * 1000 + 500, Mathf.FloorToInt(point.z) * 1000 + 500) ? "可以投放 " + Rules.Spec(troop).Name : "请在橙线外投兵";
+                Rect promptRect = new Rect(Input.mousePosition.x + 16, Screen.height - Input.mousePosition.y + 16, 180, 32);
+                Box(promptRect); GUI.Label(new Rect(promptRect.x + 9, promptRect.y + 5, promptRect.width - 18, 24), prompt, small);
             }
         }
         private void Bar(Vector3 position, float fraction, Color color)
@@ -440,6 +451,7 @@ namespace Hearthhold.UnityClient
             GUI.color = Color.black; GUI.DrawTexture(new Rect(screen.x - 20, Screen.height - screen.y, 40, 5), Texture2D.whiteTexture);
             GUI.color = color; GUI.DrawTexture(new Rect(screen.x - 19, Screen.height - screen.y + 1, 38 * fraction, 3), Texture2D.whiteTexture); GUI.color = Color.white;
         }
+        private static Color HealthColor(float fraction) { return fraction > 0.6f ? Mint : fraction > 0.3f ? Gold : new Color32(235, 91, 78, 255); }
         private static void Box(Rect rect)
         {
             GUI.color = new Color(0.075f, 0.14f, 0.12f, 0.96f); GUI.DrawTexture(rect, Texture2D.whiteTexture); GUI.color = Color.white;

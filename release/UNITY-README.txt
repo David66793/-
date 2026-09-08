@@ -1,9 +1,14 @@
-篝火堡垒 / HEARTHHOLD 0.3.0-preview
+篝火堡垒 / HEARTHHOLD 0.4.0-preview
 Unity 3D Windows x64 离线试玩版
 
 运行：完整解压压缩包后，双击 Hearthhold.exe。
 不要只复制exe；Hearthhold_Data、MonoBleedingEdge、UnityPlayer.dll及其他同级文件均为运行所需。
 发布包运行时不需要安装Unity。
+
+0.4更新：
+建筑选中圆环、带三维模型的建造与移动预览、清晰的投兵边界。
+兵种平滑移动，新增远程弹道、近战冲击、治疗范围、受击闪光与摧毁碎片。
+战斗面板显示存活/待命人数，血条根据危险程度改变颜色。
 
 第一次玩：
 1. 点击左侧“收取”，获得已经产生的资源。

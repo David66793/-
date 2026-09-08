@@ -16,6 +16,8 @@ artifacts/*
 artifacts/screenshots/*
 !artifacts/screenshots/01-home.png
 !artifacts/screenshots/18-unity-home.png
+!artifacts/screenshots/20-unity-home-v04.png
+!artifacts/screenshots/21-unity-battle-v04.png
 Saves/
 **/Saves/
 *.exe

@@ -26,6 +26,22 @@ namespace Hearthhold.UnityClient
             GameObject root = Create("troop:" + unit.Kind, ModelFactory.Troop(unit.Kind), parent);
             root.name = unit.Spec.Name; return root;
         }
+        public GameObject BuildingPreview(BuildingKind kind, int level, Transform parent)
+        {
+            GameObject root = Create("building:" + kind + ":" + level, ModelFactory.Building(kind, level), parent);
+            root.name = Rules.Spec(kind).Name + " preview";
+            return root;
+        }
+        public static void Tint(GameObject root, Color color)
+        {
+            if (root == null) return;
+            Renderer renderer = root.GetComponent<Renderer>();
+            if (renderer == null) return;
+            MaterialPropertyBlock properties = new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(properties);
+            properties.SetColor("_BaseColor", color);
+            renderer.SetPropertyBlock(properties);
+        }
         private GameObject Create(string key, ModelMesh geometry, Transform parent)
         {
             Mesh mesh;
