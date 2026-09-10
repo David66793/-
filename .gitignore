@@ -21,6 +21,11 @@ artifacts/screenshots/*
 !artifacts/screenshots/23-unity-home-v05.png
 !artifacts/screenshots/24-unity-campaign-v05.png
 !artifacts/screenshots/25-unity-final-mission-v05.png
+!artifacts/screenshots/26-native-training-v06.png
+!artifacts/screenshots/27-unity-home-v06.png
+!artifacts/screenshots/28-unity-campaign-v06.png
+!artifacts/screenshots/29-unity-training-v06.png
+!artifacts/screenshots/30-unity-battle-v06.png
 Saves/
 **/Saves/
 *.exe

@@ -275,13 +275,43 @@ namespace Hearthhold.Preview
         private void DrawEffect(Graphics g, CombatEffect effect)
         {
             PointF a = Project(effect.X / 1000f, effect.Z / 1000f, 14), b = Project(effect.EndX / 1000f, effect.EndZ / 1000f, 18);
-            if (effect.Kind <= 1)
-            { using (Pen pen = new Pen(effect.Kind == 0 ? Cream : Color.FromArgb(243, 183, 95), effect.Kind == 0 ? 1.6f : 3)) g.DrawLine(pen, a, b); }
-            else if (effect.Kind == 3) DrawRange(g, effect.X / 1000f, effect.Z / 1000f, 5, Mint, 3);
+            if (effect.Kind == 0 || effect.Kind == 5)
+            {
+                Color arrow = effect.Kind == 5 ? Color.FromArgb(255, 183, 72) : Cream;
+                using (Pen glow = new Pen(Color.FromArgb(75, arrow), effect.Kind == 5 ? 5 : 3)) g.DrawLine(glow, a, b);
+                using (Pen pen = new Pen(arrow, effect.Kind == 5 ? 2.2f : 1.5f)) g.DrawLine(pen, a, b);
+                float dx = b.X - a.X, dy = b.Y - a.Y, length = Math.Max(1, (float)Math.Sqrt(dx * dx + dy * dy)); dx /= length; dy /= length;
+                PointF left = new PointF(b.X - dx * 8 - dy * 4, b.Y - dy * 8 + dx * 4), right = new PointF(b.X - dx * 8 + dy * 4, b.Y - dy * 8 - dx * 4);
+                Polygon(g, arrow, b, left, right);
+            }
+            else if (effect.Kind == 1)
+            {
+                using (Pen smoke = new Pen(Color.FromArgb(115, 74, 70, 63), 7)) g.DrawLine(smoke, a, b);
+                using (Pen core = new Pen(Color.FromArgb(255, 191, 76), 3)) g.DrawLine(core, a, b);
+                using (Brush hot = new SolidBrush(Color.FromArgb(255, 219, 129))) g.FillEllipse(hot, b.X - 6, b.Y - 4, 12, 8);
+                for (int i = 0; i < 5; i++) using (Pen spark = new Pen(Color.FromArgb(220 - i * 26, Gold), 2)) g.DrawLine(spark, b.X, b.Y, b.X + (i - 2) * 7, b.Y - 7 - i % 2 * 5);
+            }
+            else if (effect.Kind == 3)
+            {
+                DrawRange(g, effect.X / 1000f, effect.Z / 1000f, 5, Mint, 3);
+                DrawRange(g, effect.X / 1000f, effect.Z / 1000f, 3.6f, Color.FromArgb(190, 217, 255, 229), 2);
+                for (int i = 0; i < 9; i++)
+                {
+                    double angle = i * Math.PI * 2 / 9 + animation * 0.4;
+                    float px = b.X + (float)Math.Cos(angle) * (18 + i % 3 * 11) * zoom, py = b.Y + (float)Math.Sin(angle) * (8 + i % 3 * 5) * zoom - (24 - effect.Ticks) * 0.7f;
+                    using (Brush mote = new SolidBrush(Color.FromArgb(Math.Min(230, effect.Ticks * 9), Mint))) g.FillEllipse(mote, px - 2, py - 2, 4, 4);
+                }
+            }
             else
             {
                 float radius = effect.Kind == 4 ? (25 - effect.Ticks) * 1.5f * zoom : 7 * zoom;
-                using (Pen pen = new Pen(Color.FromArgb(Math.Min(255, effect.Ticks * 10), Gold), 2)) g.DrawEllipse(pen, b.X - radius, b.Y - radius / 2, radius * 2, radius);
+                using (Brush dust = new SolidBrush(Color.FromArgb(Math.Min(115, effect.Ticks * 5), 151, 119, 82))) g.FillEllipse(dust, b.X - radius, b.Y - radius / 2, radius * 2, radius);
+                using (Pen pen = new Pen(Color.FromArgb(Math.Min(255, effect.Ticks * 10), Gold), 2.4f)) g.DrawEllipse(pen, b.X - radius, b.Y - radius / 2, radius * 2, radius);
+                for (int i = 0; i < (effect.Kind == 4 ? 8 : 4); i++)
+                {
+                    float angle = (float)(i * Math.PI * 2 / (effect.Kind == 4 ? 8 : 4));
+                    using (Brush spark = new SolidBrush(i % 2 == 0 ? Gold : Color.FromArgb(214, 118, 66))) g.FillRectangle(spark, b.X + (float)Math.Cos(angle) * radius - 2, b.Y + (float)Math.Sin(angle) * radius * 0.5f - 2, 4, 4);
+                }
             }
         }
         private void DrawFire(Graphics g, float x, float y, float scale)

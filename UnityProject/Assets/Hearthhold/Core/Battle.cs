@@ -12,15 +12,20 @@ namespace Hearthhold.Core
         public readonly List<string> Commands = new List<string>();
         public readonly int[] Available = new int[4];
         public readonly Building[,] Occupied = new Building[Rules.MapSize, Rules.MapSize];
-        public int TickNumber, Revision, Mission, SpellCharges = 2, NextUnitId = 1;
+        public int TickNumber, Revision, Mission, SpellCharges = 2, NextUnitId = 1, InitialHousing;
         public bool Started, Finished, Settled;
         public int GoldReward, CrystalReward;
         public Battle(int mission) : this(Missions.Create(mission), mission) { }
-        public Battle(List<Building> buildings, int mission)
+        public Battle(List<Building> buildings, int mission) : this(buildings, mission, null) { }
+        public Battle(List<Building> buildings, int mission, int[] army)
         {
             Mission = mission;
             foreach (Building original in buildings) { Building b = original.Copy(); b.Cooldown = 0; Buildings.Add(b); }
-            for (int i = 0; i < Available.Length; i++) Available[i] = Rules.Troops[i].Count;
+            for (int i = 0; i < Available.Length; i++)
+            {
+                Available[i] = army != null && i < army.Length ? Math.Max(0, army[i]) : Rules.Troops[i].Count;
+                InitialHousing += Available[i] * Rules.Troops[i].Housing;
+            }
             RebuildGrid();
         }
         public int SecondsLeft { get { return Math.Max(0, 180 - TickNumber / Rules.TicksPerSecond); } }
@@ -94,7 +99,7 @@ namespace Hearthhold.Core
                 {
                     target.Health = Math.Max(0, target.Health - b.Spec.Damage * (b.Level + 1) / 2);
                     b.Cooldown = b.Spec.Cooldown;
-                    Effects.Add(new CombatEffect(b.CenterX, b.CenterZ, target.X, target.Z, 5, 1));
+                    Effects.Add(new CombatEffect(b.CenterX, b.CenterZ, target.X, target.Z, 7, b.Kind == BuildingKind.Watchtower ? 5 : 1));
                 }
             }
             bool reserves = false; foreach (int count in Available) if (count > 0) reserves = true;

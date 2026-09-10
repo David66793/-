@@ -15,7 +15,7 @@ internal static class CoreTests
         Stopwatch watch = Stopwatch.StartNew();
         try
         {
-            Construction(); Economy(); Persistence(); Combat(); Determinism(); MissionsCheck(); Progression(); LimitsAndDemolition(); ModelChecks();
+            Construction(); Economy(); Persistence(); Combat(); Determinism(); MissionsCheck(); Progression(); Training(); LimitsAndDemolition(); ModelChecks();
             Console.WriteLine("\n" + count + " checks passed in " + watch.Elapsed.TotalSeconds.ToString("F2") + "s."); return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
@@ -148,7 +148,7 @@ internal static class CoreTests
         Check(read.Buildings.Count == v.Buildings.Count && read.Gold == v.Gold, "Save roundtrip preserves settlement");
         string legacyPath = Path.Combine(directory, "legacy-v02.xml");
         string legacyXml = File.ReadAllText(path);
-        foreach (string element in new[] { "CampaignStars", "CampaignBest", "ClaimedAchievements" }) legacyXml = WithoutElement(legacyXml, element);
+        foreach (string element in new[] { "CampaignStars", "CampaignBest", "ClaimedAchievements", "ArmyInitialized", "ArmyCounts", "TrainingQueue", "TrainingStartedUtcTicks" }) legacyXml = WithoutElement(legacyXml, element);
         File.WriteAllText(legacyPath, legacyXml);
         VillageData legacyRead = SaveStore.Load(legacyPath, out message);
         Check(legacyRead.CampaignStars.Count == Missions.Count && legacyRead.UnlockedMissionCount == 1, "Legacy save gains default campaign progress on load");
@@ -170,6 +170,10 @@ internal static class CoreTests
     }
     private static string WithoutElement(string xml, string name)
     {
+        string selfClosing = "<" + name + " />";
+        if (xml.IndexOf(selfClosing, StringComparison.Ordinal) >= 0) return xml.Replace(selfClosing, "");
+        selfClosing = "<" + name + "/>";
+        if (xml.IndexOf(selfClosing, StringComparison.Ordinal) >= 0) return xml.Replace(selfClosing, "");
         string opening = "<" + name + ">", closing = "</" + name + ">";
         int start = xml.IndexOf(opening, StringComparison.Ordinal), end = xml.IndexOf(closing, StringComparison.Ordinal);
         if (start < 0 || end < start) return xml;
@@ -282,5 +286,65 @@ internal static class CoreTests
         session.ReturnHome();
         session.MissionIndex = 0; session.BeginBattle(); session.Battle.Finish(); session.Settle();
         Check(session.Village.CampaignStars[0] == 3 && session.Village.CampaignBest[0] == 100, "Lower replay result cannot erase a campaign record");
+    }
+    private static void Training()
+    {
+        DateTime start = DateTime.UtcNow;
+        GameSession session = NewSession();
+        Check(session.Village.ArmyHousing == 45 && session.Village.ArmyCapacity == 45 && session.Village.ArmyCounts[2] == 3, "Fresh village receives a balanced starter formation");
+        int gold = session.Village.Gold;
+        Check(!session.QueueTroop(TroopKind.Vanguard, start) && session.Village.Gold == gold, "Full formation rejects extra training without spending gold");
+        Check(session.DismissTroop(TroopKind.Vanguard) && session.Village.ArmyHousing == 44, "Dismissing a trained troop frees its housing space");
+        Check(session.QueueTroop(TroopKind.Vanguard, start) && session.Village.QueuedHousing == 1 && session.Village.Gold == gold - Rules.Spec(TroopKind.Vanguard).TrainCost, "Manual training spends cost and enters the queue");
+        Check(!session.AdvanceTraining(start.AddSeconds(1)) && session.Village.ArmyCounts[0] == 11, "Training does not finish before its duration");
+        Check(session.AdvanceTraining(start.AddSeconds(2)) && session.Village.ArmyCounts[0] == 12 && session.Village.TrainingQueue.Count == 0, "Training completes at its deterministic duration");
+        session.DismissTroop(TroopKind.Ranger); gold = session.Village.Gold;
+        session.QueueTroop(TroopKind.Ranger, start.AddSeconds(3));
+        Check(session.CancelLastTraining(start.AddSeconds(3)) && session.Village.Gold == gold && session.Village.TrainingQueue.Count == 0, "Canceling queued training refunds its full cost");
+
+        GameSession refund = NewSession(); refund.DismissTroop(TroopKind.Vanguard); refund.QueueTroop(TroopKind.Vanguard, start);
+        refund.Village.Gold = refund.Village.Capacity;
+        Check(!refund.CancelLastTraining(start) && refund.Village.TrainingQueue.Count == 1, "Full warehouse preserves queued training instead of truncating its refund");
+        refund.Village.Gold -= Rules.Spec(TroopKind.Vanguard).TrainCost;
+        Check(refund.CancelLastTraining(start) && refund.Village.Gold == refund.Village.Capacity, "Training remains cancelable for a full refund after freeing warehouse space");
+
+        GameSession preset = NewSession();
+        for (int i = 0; i < preset.Village.ArmyCounts.Count; i++) preset.Village.ArmyCounts[i] = 0;
+        int presetCost = 0; for (int i = 0; i < 4; i++) presetCost += Rules.FormationCounts[1][i] * Rules.Troops[i].TrainCost;
+        gold = preset.Village.Gold;
+        Check(preset.QueueFormation(1, start) && preset.Village.QueuedHousing == 45 && preset.Village.Gold == gold - presetCost, "Heavy formation fills the queue with its exact cost and housing");
+        Check(preset.AdvanceTraining(start.AddMinutes(5)) && preset.Village.ArmyHousing == 45 && preset.Village.TrainingQueue.Count == 0, "Offline elapsed time completes the queued formation");
+        preset.BeginBattle();
+        Check(preset.Battle != null && preset.Battle.Available[0] == 7 && preset.Battle.Available[2] == 4 && preset.Battle.InitialHousing == 45, "Battle receives the selected trained composition");
+        preset.Battle.Deploy(TroopKind.Vanguard, 9500, 18000); preset.Battle.Finish(); preset.Settle();
+        Check(preset.Village.ArmyCounts[0] == 6 && preset.Village.ArmyCounts[2] == 4, "Only deployed troops are consumed and unused reserves return home");
+        preset.ReturnHome(); for (int i = 0; i < preset.Village.ArmyCounts.Count; i++) preset.Village.ArmyCounts[i] = 0;
+        preset.BeginBattle(); Check(preset.Battle == null, "Empty formation cannot start an expedition");
+        GameSession capacity = NewSession(); foreach (Building b in capacity.Village.Buildings) if (b.Kind == BuildingKind.Barracks) b.Level = 2;
+        Check(capacity.Village.ArmyCapacity == 60, "Upgrading the expedition camp increases army capacity");
+
+        Battle heavy = new Battle(Missions.Create(3), 3, Rules.FormationCounts[1]);
+        Battle ranged = new Battle(Missions.Create(3), 3, Rules.FormationCounts[2]);
+        bool deployed = true;
+        for (int kind = 0; kind < 4; kind++)
+        {
+            int heavyCount = heavy.Available[kind], rangedCount = ranged.Available[kind];
+            for (int i = 0; i < heavyCount; i++) deployed &= heavy.Deploy((TroopKind)kind, 500, 500);
+            for (int i = 0; i < rangedCount; i++) deployed &= ranged.Deploy((TroopKind)kind, 500, 500);
+        }
+        Check(deployed, "Formation simulation deploys both selected rosters");
+        for (int i = 0; i < 900 && (!heavy.Finished || !ranged.Finished); i++) { heavy.Step(); ranged.Step(); }
+        Check(heavy.InitialHousing == ranged.InitialHousing && heavy.Units.Count != ranged.Units.Count, "Equal housing can represent materially different troop mixes");
+        Check(heavy.StateFingerprint() != ranged.StateFingerprint(), "Different formations produce different battle states under identical deployment orders");
+
+        GameSession abandoned = NewSession(); int[] originalArmy = abandoned.Village.ArmyCounts.ToArray();
+        abandoned.BeginBattle(); abandoned.Battle.Deploy(TroopKind.Vanguard, 500, 500); abandoned.Battle.Deploy(TroopKind.Guardian, 500, 500);
+        bool restored = abandoned.AbandonBattle();
+        for (int i = 0; i < originalArmy.Length; i++) restored &= abandoned.Village.ArmyCounts[i] == originalArmy[i];
+        Check(restored && abandoned.Battle == null && abandoned.Village.Wins == 0, "Abandoning an uncommitted battle restores the full roster without rewards");
+
+        VillageData invalid = VillageData.Create(); invalid.TrainingQueue.Add(99); bool rejected = false;
+        try { SaveStore.Validate(invalid); } catch (InvalidDataException) { rejected = true; }
+        Check(rejected, "Invalid training queue data is rejected on load");
     }
 }

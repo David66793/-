@@ -6,10 +6,10 @@ namespace Hearthhold.Preview
 {
     public sealed partial class GameWindow
     {
-        private bool showArmyGuide, showBattleBrief, battleBriefSeen, showCampaign;
+        private bool showArmyGuide, showBattleBrief, battleBriefSeen, showCampaign, showTraining;
         private int demolishId = -1;
         private TroopKind guideTroop = TroopKind.Guardian;
-        private bool ModalActive { get { return showHelp || showArmyGuide || showBattleBrief || showCampaign || demolishId >= 0; } }
+        private bool ModalActive { get { return showHelp || showArmyGuide || showBattleBrief || showCampaign || showTraining || demolishId >= 0; } }
         private void RequestDemolition()
         {
             Building b = Session.Find(selectedId);
@@ -91,12 +91,47 @@ namespace Hearthhold.Preview
             TextAt(g, spec.Name, dx, y + 111, 30, Cream, true);
             TextAt(g, spec.Role, dx, y + 158, 14, Gold, true);
             TextAt(g, "生命 " + spec.Health + "    单次伤害 " + spec.Damage, dx, y + 204, 14, Cream, false);
-            TextAt(g, "射程 " + (spec.Range / 1000f).ToString("0.##") + " 格    本场 " + spec.Count + " 名", dx, y + 234, 13, Muted, false);
+            TextAt(g, "射程 " + (spec.Range / 1000f).ToString("0.##") + " 格    占 " + spec.Housing + " 营位    训练 " + spec.TrainSeconds + " 秒", dx, y + 234, 13, Muted, false);
             TextBox(g, spec.Description, new RectangleF(dx, y + 283, available, 60), 14, Cream);
             TextAt(g, "怎么用", dx, y + 349, 14, Gold, true);
             TextBox(g, spec.Tactics, new RectangleF(dx, y + 376, available, 52), 14, Cream);
             TextBox(g, "注意：" + spec.Weakness, new RectangleF(dx, y + 436, available, 52), 13, Color.FromArgb(218, 177, 143));
             Button(g, "返回游戏", new RectangleF(x + 26, y + 503, width - 52, 42), delegate { showArmyGuide = false; }, true, false);
+        }
+        private void DrawTraining(Graphics g)
+        {
+            ModalBackdrop(g);
+            float width = Math.Min(ClientSize.Width - 60, 1000), height = Math.Min(ClientSize.Height - 40, 650);
+            float x = (ClientSize.Width - width) / 2, y = (ClientSize.Height - height) / 2;
+            Panel(g, new RectangleF(x, y, width, height), Color.FromArgb(26, 43, 36), Gold, 16);
+            int ready = Session.Village.ArmyHousing, queued = Session.Village.QueuedHousing;
+            TextAt(g, "远征编队 · " + ready + " 已就绪 / " + queued + " 训练中 / " + Session.Village.ArmyCapacity + " 营位", x + 27, y + 22, 24, Cream, true);
+            string queueState = Session.Village.TrainingQueue.Count == 0 ? "队列为空" : "下一个 " + Rules.Troops[Session.Village.TrainingQueue[0]].Name + " · 约 " + Session.TrainingSecondsLeft(DateTime.UtcNow) + " 秒";
+            TextAt(g, queueState + "；只有实际投下的士兵会消耗，未投兵力会返回营地。", x + 29, y + 61, 12, Muted, false);
+            float cardWidth = (width - 66) / 4;
+            for (int i = 0; i < Rules.Troops.Length; i++)
+            {
+                TroopKind kind = (TroopKind)i, capturedKind = kind; TroopSpec spec = Rules.Spec(kind);
+                float cx = x + 25 + i * (cardWidth + 5);
+                Panel(g, new RectangleF(cx, y + 94, cardWidth, 284), Color.FromArgb(34, 52, 44), Color.FromArgb(70, 91, 68), 9);
+                PaintTroopPortrait(g, kind, new RectangleF(cx + cardWidth / 2 - 40, y + 105, 80, 104));
+                TextAt(g, spec.Name, cx + 15, y + 216, 18, Cream, true);
+                TextAt(g, "就绪 " + Session.Village.ArmyCounts[i] + " · 队列 " + Session.Village.QueuedCount(kind), cx + 15, y + 249, 12, Gold, true);
+                TextAt(g, "占 " + spec.Housing + " 营位 · " + spec.TrainCost + " 金 · " + spec.TrainSeconds + " 秒", cx + 15, y + 276, 11, Muted, false);
+                TextBox(g, spec.Role, new RectangleF(cx + 15, y + 306, cardWidth - 30, 30), 11, Cream);
+                Button(g, "− 遣散", new RectangleF(cx + 13, y + 337, (cardWidth - 31) / 2, 30), delegate { if (Session.DismissTroop(capturedKind)) Persist(); }, false, false);
+                Button(g, "+ 训练", new RectangleF(cx + 18 + (cardWidth - 31) / 2, y + 337, (cardWidth - 31) / 2, 30), delegate { if (Session.QueueTroop(capturedKind, DateTime.UtcNow)) Persist(); }, true, false);
+            }
+            TextAt(g, "空编队可一键安排预设；不同配比会改变破墙、承伤与远程输出。", x + 28, y + 402, 12, Muted, false);
+            float presetWidth = (width - 70) / 3;
+            for (int i = 0; i < Rules.FormationNames.Length; i++)
+            {
+                int preset = i;
+                Button(g, Rules.FormationNames[i], new RectangleF(x + 25 + i * (presetWidth + 10), y + 430, presetWidth, 40), delegate { if (Session.QueueFormation(preset, DateTime.UtcNow)) Persist(); }, false, false);
+            }
+            Button(g, "取消队尾训练并退款", new RectangleF(x + 25, y + 489, (width - 60) / 2, 38), delegate { if (Session.CancelLastTraining(DateTime.UtcNow)) Persist(); }, false, false);
+            Button(g, "返回聚落", new RectangleF(x + 35 + (width - 60) / 2, y + 489, (width - 60) / 2, 38), delegate { showTraining = false; }, true, false);
+            TextAt(g, "训练按真实时间推进，离线时间也会结算；远征期间队列暂停。升级或增建远征营可扩容。", x + 29, y + 549, 11, Muted, false);
         }
         private void DrawBattleBrief(Graphics g)
         {

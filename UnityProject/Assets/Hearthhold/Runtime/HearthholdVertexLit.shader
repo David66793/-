@@ -37,8 +37,12 @@ Shader "Hearthhold/VertexLit"
                 Light mainLight = GetMainLight(TransformWorldToShadowCoord(input.positionWS));
                 half diffuse = saturate(dot(normal, mainLight.direction));
                 half3 illumination = max(SampleSH(normal), half3(0.22,0.25,0.24));
-                illumination += mainLight.color * diffuse * lerp(0.3h,1.0h,mainLight.shadowAttenuation);
-                return half4(input.color.rgb * _BaseColor.rgb * illumination,1);
+                illumination += mainLight.color * (0.12h + diffuse * 0.88h) * lerp(0.28h,1.0h,mainLight.shadowAttenuation);
+                half3 viewDirection = normalize(_WorldSpaceCameraPos - input.positionWS);
+                half rim = pow(1.0h - saturate(dot(normal, viewDirection)), 3.0h) * 0.11h;
+                half topLift = saturate(normal.y) * 0.07h;
+                half3 baseColor = input.color.rgb * _BaseColor.rgb;
+                return half4(baseColor * illumination + baseColor * topLift + rim * half3(0.16h,0.21h,0.20h),1);
             }
             ENDHLSL
         }

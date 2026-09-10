@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'Home', 'Campaign', 'Battle')][string]$Case = 'All',
+    [ValidateSet('All', 'Home', 'Campaign', 'Training', 'Battle')][string]$Case = 'All',
     [string]$PlayerPath = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -21,6 +21,7 @@ function Invoke-HearthholdSmoke([string]$Name, [string]$FileName, [string]$Mode)
     )
     if ($Mode -eq 'Battle') { $taskArguments += '-hearthhold-smoke-battle' }
     if ($Mode -eq 'Campaign') { $taskArguments += '-hearthhold-smoke-campaign' }
+    if ($Mode -eq 'Training') { $taskArguments += '-hearthhold-smoke-training' }
     $taskArguments += @('-logFile', ('"' + $taskLog + '"'))
     $taskStarted = [DateTime]::UtcNow
     Write-Output ('Starting ' + $Name + ' smoke test. The game window closes automatically.')
@@ -34,6 +35,7 @@ function Invoke-HearthholdSmoke([string]$Name, [string]$FileName, [string]$Mode)
     Write-Output ($Name + ' smoke test passed: ' + $taskShot + ' (' + $taskImage.Length + ' bytes)')
 }
 
-if ($Case -eq 'All' -or $Case -eq 'Home') { Invoke-HearthholdSmoke 'home-v05' '23-unity-home-v05.png' 'Home' }
-if ($Case -eq 'All' -or $Case -eq 'Campaign') { Invoke-HearthholdSmoke 'campaign-v05' '24-unity-campaign-v05.png' 'Campaign' }
-if ($Case -eq 'All' -or $Case -eq 'Battle') { Invoke-HearthholdSmoke 'final-mission-v05' '25-unity-final-mission-v05.png' 'Battle' }
+if ($Case -eq 'All' -or $Case -eq 'Home') { Invoke-HearthholdSmoke 'home-v06' '27-unity-home-v06.png' 'Home' }
+if ($Case -eq 'All' -or $Case -eq 'Campaign') { Invoke-HearthholdSmoke 'campaign-v06' '28-unity-campaign-v06.png' 'Campaign' }
+if ($Case -eq 'All' -or $Case -eq 'Training') { Invoke-HearthholdSmoke 'training-v06' '29-unity-training-v06.png' 'Training' }
+if ($Case -eq 'All' -or $Case -eq 'Battle') { Invoke-HearthholdSmoke 'battle-v06' '30-unity-battle-v06.png' 'Battle' }

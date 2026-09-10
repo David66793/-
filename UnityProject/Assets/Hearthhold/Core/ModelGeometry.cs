@@ -33,10 +33,10 @@ namespace Hearthhold.Core
     }
     public static class ModelFactory
     {
-        private const int Stone = 0xC7B993, LightStone = 0xE3D3A7, DarkStone = 0x8C9077;
-        private const int Timber = 0x77543B, Wood = 0xAA7948, Plaster = 0xEBD8AE;
-        private const int Teal = 0x3E8190, Copper = 0xB76C45, Red = 0xBA5945;
-        private const int Metal = 0x435460, Brass = 0xD4A452, Glow = 0xFFD784, Crystal = 0x67DBB5;
+        private const int Stone = 0xBFAF88, LightStone = 0xE8D8AA, DarkStone = 0x747A6C;
+        private const int Timber = 0x65452F, Wood = 0x9B693D, Plaster = 0xE6D2A9;
+        private const int Teal = 0x286B7A, Copper = 0xA85D3A, Red = 0xA9483D;
+        private const int Metal = 0x344650, Brass = 0xD5A548, Glow = 0xFFD27A, Crystal = 0x58D7B5;
         private static ModelPoint P(float x, float y, float z) { return new ModelPoint(x, y, z); }
         public static int Tint(int rgb, int amount)
         { return Clamp((rgb >> 16 & 255) + amount) << 16 | Clamp((rgb >> 8 & 255) + amount) << 8 | Clamp((rgb & 255) + amount); }
@@ -62,7 +62,7 @@ namespace Hearthhold.Core
         public static ModelMesh Troop(TroopKind kind)
         {
             ModelMesh m = new ModelMesh();
-            float scale = kind == TroopKind.Guardian ? 1.35f : 1;
+            float scale = kind == TroopKind.Guardian ? 1.42f : kind == TroopKind.Sapper ? 1.1f : 1.08f;
             int cloth = kind == TroopKind.Ranger ? 0x48785B : kind == TroopKind.Guardian ? 0x607B93 : kind == TroopKind.Sapper ? 0xA15A3E : 0xB17D3B;
             BevelBox(m, -0.25f, 0.04f, -0.1f, 0.21f, 0.23f, 0.38f, 0.035f, Timber);
             BevelBox(m, 0.04f, 0.04f, -0.1f, 0.21f, 0.23f, 0.38f, 0.035f, Timber);
@@ -70,30 +70,39 @@ namespace Hearthhold.Core
             Box(m, 0.04f, 0.23f, -0.08f, 0.19f, 0.27f, 0.19f, 0x59625A);
             BevelBox(m, -0.32f, 0.47f, -0.16f, 0.64f, 0.57f, 0.41f, 0.09f, cloth);
             Box(m, -0.32f, 0.6f, -0.18f, 0.64f, 0.08f, 0.46f, Timber);
+            BevelBox(m, -0.43f, 0.82f, -0.12f, 0.22f, 0.22f, 0.3f, 0.065f, kind == TroopKind.Guardian ? Metal : cloth);
+            BevelBox(m, 0.21f, 0.82f, -0.12f, 0.22f, 0.22f, 0.3f, 0.065f, kind == TroopKind.Guardian ? Metal : cloth);
+            Box(m, -0.34f, 0.53f, 0.23f, 0.68f, 0.1f, 0.08f, Brass);
             Box(m, -0.065f, 0.59f, 0.285f, 0.13f, 0.11f, 0.05f, Brass);
             BevelBox(m, -0.24f, 1.03f, -0.16f, 0.48f, 0.48f, 0.44f, 0.09f, 0xE7BC87);
             Box(m, -0.14f, 1.28f, 0.285f, 0.045f, 0.06f, 0.012f, 0x3F3630);
             Box(m, 0.1f, 1.28f, 0.285f, 0.045f, 0.06f, 0.012f, 0x3F3630);
+            BevelBox(m, -0.055f, 1.14f, 0.27f, 0.11f, 0.09f, 0.08f, 0.025f, 0xC98A63);
             Beam(m, P(-0.33f, 0.93f, 0), P(-0.47f, 0.64f, 0.17f), 0.15f, cloth);
             Beam(m, P(0.33f, 0.93f, 0), P(0.48f, 0.75f, 0.23f), 0.15f, cloth);
             if (kind == TroopKind.Ranger)
             {
                 Frustum(m, 0, 1.35f, 0.01f, 0.34f, 0.08f, 0.35f, 10, 0x456E50);
+                BevelBox(m, -0.3f, 0.48f, -0.34f, 0.6f, 0.76f, 0.2f, 0.055f, 0x355F4B);
                 Beam(m, P(0.5f, 0.44f, 0.34f), P(0.73f, 0.86f, 0.41f), 0.055f, Wood);
                 Beam(m, P(0.73f, 0.86f, 0.41f), P(0.51f, 1.38f, 0.34f), 0.055f, Wood);
                 Beam(m, P(0.51f, 1.38f, 0.34f), P(0.5f, 0.44f, 0.34f), 0.012f, Plaster);
                 Box(m, -0.13f, 0.64f, -0.31f, 0.27f, 0.54f, 0.15f, Timber);
+                for (int i = 0; i < 3; i++) Beam(m, P(-0.18f + i * 0.09f, 0.92f, -0.38f), P(-0.08f + i * 0.09f, 1.58f, -0.42f), 0.018f, LightStone);
             }
             else if (kind == TroopKind.Guardian)
             {
+                BevelBox(m, -0.36f, 0.5f, -0.22f, 0.72f, 0.62f, 0.12f, 0.04f, Metal);
                 BevelBox(m, -0.3f, 1.3f, -0.2f, 0.6f, 0.31f, 0.51f, 0.07f, Metal);
                 Box(m, -0.31f, 1.24f, 0.31f, 0.62f, 0.09f, 0.05f, Brass);
                 Box(m, -0.065f, 1.25f, 0.36f, 0.13f, 0.32f, 0.035f, LightStone);
                 BevelBox(m, -0.65f, 0.3f, 0.27f, 0.47f, 0.85f, 0.12f, 0.07f, Brass);
                 BevelBox(m, -0.61f, 0.36f, 0.41f, 0.39f, 0.72f, 0.03f, 0.06f, cloth);
                 Box(m, -0.465f, 0.43f, 0.455f, 0.09f, 0.54f, 0.03f, LightStone);
+                BevelBox(m, -0.53f, 0.67f, 0.445f, 0.18f, 0.18f, 0.07f, 0.04f, Brass);
                 Beam(m, P(0.51f, 0.53f, 0.25f), P(0.6f, 1.65f, 0.18f), 0.06f, Metal);
                 BevelBox(m, 0.38f, 1.45f, 0.08f, 0.43f, 0.29f, 0.23f, 0.035f, LightStone);
+                Box(m, -0.31f, 0.38f, 0.31f, 0.62f, 0.11f, 0.06f, Brass);
             }
             else if (kind == TroopKind.Sapper)
             {
@@ -103,6 +112,10 @@ namespace Hearthhold.Core
                 Barrel(m, 0.49f, 0.44f, 0.42f, 0.24f, 0.5f);
                 Beam(m, P(0.49f, 0.97f, 0.42f), P(0.59f, 1.13f, 0.42f), 0.025f, Glow);
                 BevelBox(m, -0.23f, 0.55f, -0.4f, 0.46f, 0.52f, 0.21f, 0.05f, Wood);
+                Beam(m, P(0.42f, 0.6f, 0.25f), P(0.68f, 1.34f, 0.25f), 0.07f, Timber);
+                BevelBox(m, 0.47f, 1.24f, 0.06f, 0.48f, 0.22f, 0.38f, 0.07f, Metal);
+                Box(m, -0.28f, 0.58f, -0.43f, 0.08f, 0.46f, 0.05f, Brass);
+                Box(m, 0.2f, 0.58f, -0.43f, 0.08f, 0.46f, 0.05f, Brass);
             }
             else
             {
@@ -111,6 +124,8 @@ namespace Hearthhold.Core
                 Box(m, -0.04f, 1.62f, -0.08f, 0.08f, 0.23f, 0.29f, Red);
                 Beam(m, P(0.45f, 0.65f, 0.26f), P(0.68f, 1.58f, 0.35f), 0.06f, LightStone);
                 Beam(m, P(0.35f, 0.84f, 0.29f), P(0.62f, 0.84f, 0.29f), 0.06f, Brass);
+                BevelBox(m, -0.58f, 0.46f, 0.3f, 0.35f, 0.62f, 0.1f, 0.055f, Teal);
+                BevelBox(m, -0.53f, 0.67f, 0.39f, 0.25f, 0.22f, 0.05f, 0.035f, Brass);
             }
             foreach (ModelFace face in m.Faces)
                 for (int i = 0; i < face.Points.Length; i++) face.Points[i] = face.Points[i] * scale;
@@ -139,6 +154,8 @@ namespace Hearthhold.Core
             Flag(m, 2, h + 1.5f, 1.3f, 1, GoldColor(level));
             if (level >= 2) { Flag(m, 0.65f, h + 1.6f, 3.25f, 0.55f, Red); Flag(m, 3.4f, h + 1.6f, 0.6f, 0.55f, Red); }
             if (level == 3) BevelBox(m, 1.68f, 1.74f, 3.35f, 0.6f, 0.42f, 0.08f, 0.06f, Brass);
+            BevelBox(m, 1.7f, 0.95f, 3.38f, 0.6f, 0.78f, 0.045f, 0.035f, Teal);
+            Box(m, 1.95f, 1.08f, 3.43f, 0.1f, 0.49f, 0.025f, Brass);
             Lantern(m, 1.25f, 1.1f, 3.4f); Lantern(m, 2.75f, 1.1f, 3.4f);
         }
         private static int GoldColor(int level) { return level >= 2 ? 0xF0C166 : 0xD3A254; }
@@ -198,6 +215,8 @@ namespace Hearthhold.Core
             Beam(m, P(2.38f, 0.39f, 2.72f), P(2.38f, 1.68f, 2.72f), 0.08f, Wood);
             Beam(m, P(2.67f, 0.4f, 2.72f), P(2.67f, 1.48f, 2.72f), 0.06f, Metal);
             Flag(m, 2.75f, 1.55f, 0.45f, 0.7f, Red);
+            BevelBox(m, 0.22f, 0.36f, 2.52f, 0.62f, 0.13f, 0.46f, 0.04f, Wood);
+            for (int i = 0; i < 3; i++) Beam(m, P(0.3f + i * 0.2f, 0.5f, 2.77f), P(0.34f + i * 0.2f, 1.18f, 2.77f), 0.025f, i == 1 ? LightStone : Metal);
             if (level >= 2) BevelBox(m, 2.11f, 0.4f, 2.56f, 0.31f, 0.56f, 0.08f, 0.04f, Teal);
             if (level >= 3) Flag(m, 0.35f, 2.05f, 0.4f, 0.7f, Brass);
         }
@@ -209,6 +228,9 @@ namespace Hearthhold.Core
             BarrelAlong(m, P(0.56f, 1.18f, 1.27f), P(1.13f, 1.62f, 0.23f), 0.27f + level * 0.025f, Metal);
             BarrelAlong(m, P(1.09f, 1.6f, 0.31f), P(1.17f, 1.65f, 0.13f), 0.33f + level * 0.025f, Brass);
             BarrelAlong(m, P(1.17f, 1.65f, 0.125f), P(1.18f, 1.655f, 0.1f), 0.245f, 0x263A43);
+            BarrelAlong(m, P(0.2f, 0.72f, 1.02f), P(0.43f, 0.72f, 1.02f), 0.34f, Timber, 14);
+            BarrelAlong(m, P(1.57f, 0.72f, 1.02f), P(1.8f, 0.72f, 1.02f), 0.34f, Timber, 14);
+            BarrelAlong(m, P(0.15f, 0.72f, 1.02f), P(1.85f, 0.72f, 1.02f), 0.08f, Metal, 10);
             for (int i = 0; i < 3; i++) Frustum(m, 0.47f + i * 0.34f, 0.34f, 1.72f, 0.13f, 0.09f, 0.22f, 8, Metal);
             if (level >= 2) { BevelBox(m, 0.28f, 0.84f, 0.33f, 0.22f, 0.55f, 1.1f, 0.05f, Metal); BevelBox(m, 1.45f, 0.84f, 0.33f, 0.22f, 0.55f, 1.1f, 0.05f, Metal); }
         }

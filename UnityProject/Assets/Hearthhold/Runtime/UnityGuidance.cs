@@ -5,11 +5,11 @@ namespace Hearthhold.UnityClient
 {
     public sealed partial class GameBootstrap
     {
-        private bool showArmyGuide, showBrief, briefSeen, showCampaign;
+        private bool showArmyGuide, showBrief, briefSeen, showCampaign, showTraining;
         private int demolishId = -1;
         private TroopKind guideTroop = TroopKind.Guardian;
-        private bool ExtraModal { get { return showArmyGuide || showBrief || showCampaign || demolishId >= 0; } }
-        private void CloseExtraModals() { showArmyGuide = false; showBrief = false; showCampaign = false; demolishId = -1; }
+        private bool ExtraModal { get { return showArmyGuide || showBrief || showCampaign || showTraining || demolishId >= 0; } }
+        private void CloseExtraModals() { showArmyGuide = false; showBrief = false; showCampaign = false; showTraining = false; demolishId = -1; }
         private void AskDemolish()
         {
             Building b = session.Find(selected);
@@ -41,8 +41,9 @@ namespace Hearthhold.UnityClient
             GUI.enabled = true;
             GUI.color = new Color(0.025f, 0.055f, 0.05f, 0.94f);
             GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture); GUI.color = Color.white;
-            float w = Mathf.Min(Screen.width - 60, 830), x = (Screen.width - w) / 2, y = Mathf.Max(25, (Screen.height - 535) / 2);
-            Box(new Rect(x, y, w, 535));
+            float w = Mathf.Min(Screen.width - 60, 830), modalHeight = showTraining ? 640 : 535;
+            float x = (Screen.width - w) / 2, y = Mathf.Max(18, (Screen.height - modalHeight) / 2);
+            Box(new Rect(x, y, w, modalHeight));
             if (demolishId >= 0)
             {
                 Building b = session.Find(demolishId);
@@ -89,6 +90,30 @@ namespace Hearthhold.UnityClient
                 GUI.Label(new Rect(x + 25, y + 88, w - 50, 345), "士兵落地后自动行动，你负责位置和时机。\n\n① 按3选铁卫，先投2—3名，吸引防御塔火力。\n② 按4选破城手，紧跟铁卫，从同一侧打开城墙。\n③ 按1选先锋，沿缺口投放，清理基地内建筑。\n④ 按2选游侠，放在后方，用射程提供输出。\n\n在基地外围投兵；首次投兵后才开始180秒计时。\n按住左键可连续投兵。铁卫受伤时按Q选择治疗，点击友军附近。\n\n摧毁议事堡、50%破坏、100%破坏各得一星。", label);
                 if (GUI.Button(new Rect(x + 25, y + 462, w - 50, 44), "知道了，开始侦察")) { showBrief = false; briefSeen = true; }
             }
+            else if (showTraining)
+            {
+                int ready = session.Village.ArmyHousing, queued = session.Village.QueuedHousing;
+                GUI.Label(new Rect(x + 25, y + 21, w - 50, 38), "远征编队 · " + ready + " 已就绪 / " + queued + " 训练中 / " + session.Village.ArmyCapacity + " 营位", heading);
+                string queueState = session.Village.TrainingQueue.Count == 0 ? "训练队列为空" : "下一个 " + Rules.Troops[session.Village.TrainingQueue[0]].Name + " · 约 " + session.TrainingSecondsLeft(System.DateTime.UtcNow) + " 秒";
+                GUI.Label(new Rect(x + 25, y + 60, w - 50, 28), queueState + "；未投放士兵会返回营地。", small);
+                float cardWidth = (w - 65) / 4;
+                for (int i = 0; i < Rules.Troops.Length; i++)
+                {
+                    TroopKind kind = (TroopKind)i; TroopSpec spec = Rules.Troops[i]; float cx = x + 25 + i * (cardWidth + 5);
+                    GUI.Box(new Rect(cx, y + 97, cardWidth, 245), "");
+                    GUI.Label(new Rect(cx + 12, y + 112, cardWidth - 24, 30), spec.Name + " · " + spec.Role, label);
+                    GUI.Label(new Rect(cx + 12, y + 155, cardWidth - 24, 70), "就绪 " + session.Village.ArmyCounts[i] + "  /  队列 " + session.Village.QueuedCount(kind) + "\n占 " + spec.Housing + " 营位\n" + spec.TrainCost + " 金 · " + spec.TrainSeconds + " 秒", small);
+                    if (GUI.Button(new Rect(cx + 10, y + 287, (cardWidth - 25) / 2, 38), "− 遣散")) { if (session.DismissTroop(kind)) Save(); }
+                    if (GUI.Button(new Rect(cx + 15 + (cardWidth - 25) / 2, y + 287, (cardWidth - 25) / 2, 38), "+ 训练")) { if (session.QueueTroop(kind, System.DateTime.UtcNow)) Save(); }
+                }
+                GUI.Label(new Rect(x + 25, y + 361, w - 50, 26), "空编队可一键安排预设；配比会改变破墙、承伤与远程输出。", small);
+                float presetWidth = (w - 70) / 3;
+                for (int i = 0; i < Rules.FormationNames.Length; i++)
+                    if (GUI.Button(new Rect(x + 25 + i * (presetWidth + 10), y + 393, presetWidth, 43), Rules.FormationNames[i])) { if (session.QueueFormation(i, System.DateTime.UtcNow)) Save(); }
+                if (GUI.Button(new Rect(x + 25, y + 466, (w - 60) / 2, 43), "取消队尾训练并退款")) { if (session.CancelLastTraining(System.DateTime.UtcNow)) Save(); }
+                if (GUI.Button(new Rect(x + 35 + (w - 60) / 2, y + 466, (w - 60) / 2, 43), "返回聚落")) showTraining = false;
+                GUI.Label(new Rect(x + 25, y + 536, w - 50, 63), "训练按真实时间推进，离线时间也会结算；远征期间队列暂停。\n升级或增建远征营可扩容。", small);
+            }
             else if (showArmyGuide)
             {
                 GUI.Label(new Rect(x + 25, y + 25, w - 50, 40), "远征兵种图鉴", heading);
@@ -96,7 +121,7 @@ namespace Hearthhold.UnityClient
                     if (GUI.Button(new Rect(x + 25 + i * (w - 50) / 4, y + 87, (w - 50) / 4 - 8, 42), Rules.Troops[i].Name)) guideTroop = (TroopKind)i;
                 TroopSpec s = Rules.Spec(guideTroop);
                 GUI.Label(new Rect(x + 25, y + 154, w - 50, 40), s.Name + " · " + s.Role, heading);
-                GUI.Label(new Rect(x + 25, y + 212, w - 50, 235), "生命 " + s.Health + " / 单次伤害 " + s.Damage + " / 射程 " + (s.Range / 1000f).ToString("0.##") + "格\n\n" + s.Description + "\n\n怎么用：" + s.Tactics + "\n\n注意：" + s.Weakness, label);
+                GUI.Label(new Rect(x + 25, y + 212, w - 50, 235), "生命 " + s.Health + " / 单次伤害 " + s.Damage + " / 射程 " + (s.Range / 1000f).ToString("0.##") + "格 / 占 " + s.Housing + " 营位\n\n" + s.Description + "\n\n怎么用：" + s.Tactics + "\n\n注意：" + s.Weakness, label);
                 if (GUI.Button(new Rect(x + 25, y + 462, w - 50, 44), "返回游戏")) showArmyGuide = false;
             }
         }

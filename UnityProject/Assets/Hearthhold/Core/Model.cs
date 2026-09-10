@@ -18,9 +18,9 @@ namespace Hearthhold.Core
     public sealed class TroopSpec
     {
         public string Name, Role;
-        public int Health, Damage, Range, Speed, Cooldown, Count;
-        public TroopSpec(string name, string role, int health, int damage, int range, int speed, int cooldown, int count)
-        { Name = name; Role = role; Health = health; Damage = damage; Range = range; Speed = speed; Cooldown = cooldown; Count = count; }
+        public int Health, Damage, Range, Speed, Cooldown, Count, Housing, TrainCost, TrainSeconds;
+        public TroopSpec(string name, string role, int health, int damage, int range, int speed, int cooldown, int count, int housing, int trainCost, int trainSeconds)
+        { Name = name; Role = role; Health = health; Damage = damage; Range = range; Speed = speed; Cooldown = cooldown; Count = count; Housing = housing; TrainCost = trainCost; TrainSeconds = trainSeconds; }
         public string Description, Tactics, Weakness;
     }
 
@@ -63,16 +63,22 @@ namespace Hearthhold.Core
             new BuildingSpec("议事堡", "聚落的中心。升级后提高其他建筑的等级上限。", 4, 2200, 0, 0, 0, 0),
             new BuildingSpec("金矿", "持续产出金币。点击收取，将离线收益收入仓库。", 3, 650, 180, 0, 0, 0),
             new BuildingSpec("晶露池", "收集用于建筑升级的晶露。", 3, 600, 160, 0, 0, 0),
-            new BuildingSpec("远征营", "远征队的营地。原型提供四种预设兵种。", 3, 800, 240, 0, 0, 0),
+            new BuildingSpec("远征营", "训练远征士兵并提供营位；升级可提高编队容量。", 3, 800, 240, 0, 0, 0),
             new BuildingSpec("重弩炮", "强力单体防御，擅长击退重甲目标。", 2, 850, 220, 38, 6500, 24),
             new BuildingSpec("哨塔", "视野开阔、射程更远的防御塔。", 2, 650, 200, 19, 8000, 15),
             new BuildingSpec("石墙", "阻挡地面部队，迫使对手绕行或破墙。", 1, 430, 20, 0, 0, 0)
         };
         public static readonly TroopSpec[] Troops = {
-            new TroopSpec("先锋", "近战 · 均衡", 270, 42, 1050, 150, 15, 12),
-            new TroopSpec("游侠", "远程 · 跨墙射击", 130, 32, 4500, 125, 17, 10),
-            new TroopSpec("铁卫", "重甲 · 优先防御", 1300, 72, 1100, 85, 26, 3),
-            new TroopSpec("破城手", "攻城 · 城墙特攻", 180, 36, 1100, 165, 18, 4)
+            new TroopSpec("先锋", "近战 · 均衡", 270, 42, 1050, 150, 15, 12, 1, 15, 2),
+            new TroopSpec("游侠", "远程 · 跨墙射击", 130, 32, 4500, 125, 17, 10, 1, 20, 2),
+            new TroopSpec("铁卫", "重甲 · 优先防御", 1300, 72, 1100, 85, 26, 3, 5, 65, 6),
+            new TroopSpec("破城手", "攻城 · 城墙特攻", 180, 36, 1100, 165, 18, 4, 2, 35, 3)
+        };
+        public static readonly string[] FormationNames = { "均衡远征", "重甲破阵", "远程压制" };
+        public static readonly int[][] FormationCounts = {
+            new[] { 12, 10, 3, 4 },
+            new[] { 7, 6, 4, 6 },
+            new[] { 7, 18, 2, 5 }
         };
         public static BuildingSpec Spec(BuildingKind kind) { return Buildings[(int)kind]; }
         public static TroopSpec Spec(TroopKind kind) { return Troops[(int)kind]; }
@@ -155,6 +161,10 @@ namespace Hearthhold.Core
         public List<int> CampaignStars = new List<int>();
         public List<int> CampaignBest = new List<int>();
         public List<string> ClaimedAchievements = new List<string>();
+        public bool ArmyInitialized;
+        public List<int> ArmyCounts = new List<int>();
+        public List<int> TrainingQueue = new List<int>();
+        public long TrainingStartedUtcTicks;
         public static VillageData Create()
         {
             VillageData v = new VillageData();
@@ -167,7 +177,7 @@ namespace Hearthhold.Core
             v.Add(BuildingKind.Cannon, 15, 15);
             v.Add(BuildingKind.Watchtower, 23, 24);
             for (int x = 15; x <= 24; x++) v.Add(BuildingKind.Wall, x, 21);
-            v.EnsureProgress();
+            v.EnsureProgress(); v.EnsureArmy();
             return v;
         }
         public Building Add(BuildingKind kind, int x, int z)
@@ -187,6 +197,23 @@ namespace Hearthhold.Core
         public int Count(BuildingKind kind) { int count = 0; foreach (Building b in Buildings) if (b.Kind == kind) count++; return count; }
         public int Limit(BuildingKind kind) { return Rules.BuildLimit(kind, KeepLevel); }
         public bool AtLimit(BuildingKind kind) { return Count(kind) >= Limit(kind); }
+        [XmlIgnore] public int ArmyCapacity
+        {
+            get
+            {
+                int capacity = 0;
+                foreach (Building b in Buildings) if (b.Kind == BuildingKind.Barracks) capacity += 45 + (b.Level - 1) * 15;
+                return capacity;
+            }
+        }
+        [XmlIgnore] public int ArmyHousing
+        {
+            get { EnsureArmy(); int total = 0; for (int i = 0; i < Rules.Troops.Length; i++) total += ArmyCounts[i] * Rules.Troops[i].Housing; return total; }
+        }
+        [XmlIgnore] public int QueuedHousing
+        {
+            get { EnsureArmy(); int total = 0; foreach (int kind in TrainingQueue) if (kind >= 0 && kind < Rules.Troops.Length) total += Rules.Troops[kind].Housing; return total; }
+        }
         [XmlIgnore] public int TotalStars { get { EnsureProgress(); int total = 0; foreach (int stars in CampaignStars) total += stars; return total; } }
         [XmlIgnore] public int CompletedMissions { get { EnsureProgress(); int count = 0; foreach (int stars in CampaignStars) if (stars > 0) count++; return count; } }
         [XmlIgnore] public int UnlockedMissionCount
@@ -206,6 +233,25 @@ namespace Hearthhold.Core
             while (CampaignStars.Count < Missions.Count) CampaignStars.Add(0);
             while (CampaignBest.Count < Missions.Count) CampaignBest.Add(0);
         }
+        public void EnsureArmy()
+        {
+            if (ArmyCounts == null) ArmyCounts = new List<int>();
+            if (TrainingQueue == null) TrainingQueue = new List<int>();
+            while (ArmyCounts.Count < Rules.Troops.Length) ArmyCounts.Add(0);
+            if (!ArmyInitialized)
+            {
+                int used = 0;
+                for (int i = 0; i < Rules.Troops.Length; i++)
+                {
+                    int room = Math.Max(0, ArmyCapacity - used) / Rules.Troops[i].Housing;
+                    ArmyCounts[i] = Math.Min(Rules.Troops[i].Count, room);
+                    used += ArmyCounts[i] * Rules.Troops[i].Housing;
+                }
+                ArmyInitialized = true;
+            }
+        }
+        public int QueuedCount(TroopKind kind)
+        { EnsureArmy(); int count = 0; foreach (int queued in TrainingQueue) if (queued == (int)kind) count++; return count; }
         public bool IsMissionUnlocked(int mission) { return mission >= 0 && mission < UnlockedMissionCount; }
         public bool RecordMission(int mission, int stars, int destruction)
         {

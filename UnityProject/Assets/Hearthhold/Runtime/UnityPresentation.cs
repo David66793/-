@@ -119,22 +119,29 @@ namespace Hearthhold.UnityClient
                 Vector3 end = new Vector3(effect.EndX / 1000f, 1.15f, effect.EndZ / 1000f);
                 if (effect.Kind == 0)
                 {
-                    SpawnProjectile(start, end, Gold, 0.22f, 0.55f);
+                    SpawnArrow(start + Vector3.up * 0.15f, end, Gold, 0.2f, 0.42f);
+                    SpawnBurst(end, Gold, 3, 0.7f, 0.32f);
                     FlashBuilding(effect.EndX, effect.EndZ, Color.white);
                 }
                 else if (effect.Kind == 1)
                 {
-                    SpawnProjectile(start + Vector3.up, end, Ember, 0.2f, 1.1f);
+                    SpawnProjectile(start + Vector3.up * 0.65f, end, Ember, 0.28f, 1.35f);
+                    SpawnBurst(start + Vector3.up * 0.65f, new Color32(255, 204, 104, 255), 5, 1.25f, 0.28f);
+                    SpawnBurst(end, Ember, 8, 1.8f, 0.55f);
                     FlashUnit(effect.EndX, effect.EndZ, Danger);
                 }
                 else if (effect.Kind == 2)
                 {
-                    SpawnPulse(end + Vector3.down, Ember, 0.3f, 2.1f, 0.24f);
+                    SpawnPulse(end + Vector3.down, Ember, 0.2f, 0.95f, 0.16f);
+                    SpawnBurst(end, new Color32(255, 214, 126, 255), 4, 0.8f, 0.28f);
                     FlashBuilding(effect.EndX, effect.EndZ, Danger);
                 }
                 else if (effect.Kind == 3)
                 {
-                    SpawnPulse(new Vector3(effect.X / 1000f, 0.12f, effect.Z / 1000f), Mint, 0.4f, 10, 1.05f);
+                    Vector3 center = new Vector3(effect.X / 1000f, 0.12f, effect.Z / 1000f);
+                    SpawnPulse(center, Mint, 0.5f, 9.6f, 0.85f);
+                    SpawnPulse(center + Vector3.up * 0.04f, new Color32(184, 255, 219, 255), 0.25f, 6.8f, 0.62f);
+                    SpawnMotes(center, Mint, 14);
                     foreach (Unit unit in session.Battle.Units)
                     {
                         long dx = unit.X - effect.X, dz = unit.Z - effect.Z;
@@ -146,13 +153,33 @@ namespace Hearthhold.UnityClient
                     SpawnDestruction(new Vector3(effect.X / 1000f, 0.3f, effect.Z / 1000f));
                     FlashBuilding(effect.EndX, effect.EndZ, Ember);
                 }
+                else if (effect.Kind == 5)
+                {
+                    SpawnArrow(start + Vector3.up * 1.75f, end, new Color32(255, 196, 83, 255), 0.17f, 0.3f);
+                    SpawnBurst(start + Vector3.up * 1.75f, Gold, 3, 0.65f, 0.2f);
+                    SpawnBurst(end, Gold, 3, 0.75f, 0.3f);
+                    FlashUnit(effect.EndX, effect.EndZ, Danger);
+                }
             }
         }
 
         private void SpawnProjectile(Vector3 start, Vector3 end, Color color, float duration, float arc)
         {
-            GameObject projectile = Piece("Projectile", PrimitiveType.Sphere, start, Vector3.one * 0.28f, color, effectsRoot);
+            GameObject projectile = new GameObject("Heavy projectile"); projectile.transform.SetParent(effectsRoot, false);
+            projectile.transform.position = start; projectile.transform.rotation = Quaternion.LookRotation(end - start);
+            Piece("Hot core", PrimitiveType.Sphere, Vector3.zero, Vector3.one * 0.24f, new Color32(255, 225, 151, 255), projectile.transform);
+            Piece("Ember shell", PrimitiveType.Sphere, new Vector3(0, 0, -0.15f), Vector3.one * 0.31f, color, projectile.transform);
+            Piece("Smoke trail", PrimitiveType.Sphere, new Vector3(0, 0, -0.38f), Vector3.one * 0.25f, new Color32(82, 76, 69, 255), projectile.transform);
             projectile.AddComponent<TimedWorldEffect>().Projectile(start, end, duration, arc);
+        }
+
+        private void SpawnArrow(Vector3 start, Vector3 end, Color color, float duration, float arc)
+        {
+            GameObject arrow = new GameObject("Arrow streak"); arrow.transform.SetParent(effectsRoot, false);
+            arrow.transform.position = start; arrow.transform.rotation = Quaternion.LookRotation(end - start);
+            Piece("Shaft", PrimitiveType.Cube, new Vector3(0, 0, -0.18f), new Vector3(0.055f, 0.055f, 0.68f), color, arrow.transform);
+            Piece("Arrow head", PrimitiveType.Sphere, new Vector3(0, 0, 0.19f), Vector3.one * 0.13f, new Color32(255, 236, 183, 255), arrow.transform);
+            arrow.AddComponent<TimedWorldEffect>().Projectile(start, end, duration, arc);
         }
 
         private void SpawnPulse(Vector3 position, Color color, float startScale, float endScale, float duration)
@@ -164,13 +191,36 @@ namespace Hearthhold.UnityClient
 
         private void SpawnDestruction(Vector3 position)
         {
-            SpawnPulse(position, Ember, 0.8f, 4.2f, 0.55f);
-            for (int i = 0; i < 8; i++)
+            SpawnPulse(position, new Color32(205, 151, 92, 255), 0.7f, 4.8f, 0.62f);
+            SpawnBurst(position + Vector3.up * 0.2f, new Color32(208, 169, 111, 255), 14, 2.2f, 0.95f);
+            for (int i = 0; i < 11; i++)
             {
-                float angle = i * Mathf.PI * 2 / 8;
+                float angle = i * Mathf.PI * 2 / 11;
                 GameObject debris = Piece("Rubble", PrimitiveType.Cube, position + Vector3.up * 0.25f, Vector3.one * (0.18f + (i % 3) * 0.05f), i % 2 == 0 ? Ember : new Color32(116, 91, 70, 255), effectsRoot);
                 Vector3 velocity = new Vector3(Mathf.Cos(angle) * 2.1f, 2.4f + (i % 3) * 0.3f, Mathf.Sin(angle) * 2.1f);
                 debris.AddComponent<TimedWorldEffect>().Debris(velocity, 0.85f);
+            }
+        }
+
+        private void SpawnBurst(Vector3 position, Color color, int count, float force, float duration)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                float angle = i * Mathf.PI * 2 / Mathf.Max(1, count) + (i % 2) * 0.21f;
+                GameObject spark = Piece("Impact spark", i % 3 == 0 ? PrimitiveType.Sphere : PrimitiveType.Cube, position, Vector3.one * (0.08f + i % 3 * 0.025f), color, effectsRoot);
+                Vector3 velocity = new Vector3(Mathf.Cos(angle) * force, 0.65f + (i % 4) * force * 0.24f, Mathf.Sin(angle) * force);
+                spark.AddComponent<TimedWorldEffect>().Debris(velocity, duration);
+            }
+        }
+
+        private void SpawnMotes(Vector3 center, Color color, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                float angle = i * Mathf.PI * 2 / count, radius = 0.7f + i % 5 * 0.78f;
+                Vector3 position = center + new Vector3(Mathf.Cos(angle) * radius, 0.06f + i % 3 * 0.08f, Mathf.Sin(angle) * radius);
+                GameObject mote = Piece("Healing mote", PrimitiveType.Sphere, position, Vector3.one * (0.08f + i % 2 * 0.035f), color, effectsRoot);
+                mote.AddComponent<TimedWorldEffect>().Mote(new Vector3(Mathf.Cos(angle) * 0.18f, 1.2f + i % 4 * 0.2f, Mathf.Sin(angle) * 0.18f), 0.9f);
             }
         }
 
@@ -213,7 +263,7 @@ namespace Hearthhold.UnityClient
             for (int i = 0; i < 5; i++) session.Battle.Deploy(TroopKind.Vanguard, 9000, 17500 + i * 1200);
             for (int i = 0; i < 5; i++) session.Battle.Deploy(TroopKind.Ranger, 7500, 17000 + i * 1400);
             for (int i = 0; i < 240 && !session.Battle.Finished; i++) session.Battle.Step();
-            session.Notice = "0.5 最终关卡验收：三级王庭、内墙、弹道与战斗状态。";
+            session.Notice = "0.6 战斗视觉验收：分型弹道、命中火花、烟尘与建筑反击。";
         }
 
         private void PrepareCampaignSmoke()
@@ -224,14 +274,23 @@ namespace Hearthhold.UnityClient
             session.Village.Wins = 3;
             session.MissionIndex = 3;
             selected = -1; showCampaign = true;
-            session.Notice = "0.5 战役进度验收：逐关解锁、最佳纪录与成就奖励。";
+            session.Notice = "0.6 战役进度验收：逐关解锁、最佳纪录与成就奖励。";
+        }
+
+        private void PrepareTrainingSmoke()
+        {
+            session.Village.ArmyCounts[(int)TroopKind.Vanguard] -= 2;
+            session.QueueTroop(TroopKind.Vanguard, System.DateTime.UtcNow);
+            session.QueueTroop(TroopKind.Vanguard, System.DateTime.UtcNow);
+            selected = -1; showTraining = true;
+            session.Notice = "0.6 编队验收：营位、训练成本、队列与三种战术预设。";
         }
 
         private void PrepareHomeSmoke()
         {
             foreach (Building building in session.Village.Buildings)
                 if (building.Kind == BuildingKind.Keep) { selected = building.Id; break; }
-            session.Notice = "0.5 聚落验收：旧存档兼容、战役入口与建造信息。";
+            session.Notice = "0.6 聚落验收：训练入口、旧存档兼容与建造信息。";
         }
 
         private void DisposePresentation()
@@ -242,7 +301,7 @@ namespace Hearthhold.UnityClient
 
     internal sealed class TimedWorldEffect : MonoBehaviour
     {
-        private enum EffectMode { Projectile, Pulse, Debris }
+        private enum EffectMode { Projectile, Pulse, Debris, Mote }
         private EffectMode mode;
         private Vector3 start, end, velocity;
         private float elapsed, duration, arc, startScale, endScale;
@@ -253,6 +312,8 @@ namespace Hearthhold.UnityClient
         { mode = EffectMode.Pulse; startScale = from; endScale = to; duration = seconds; transform.localScale = Vector3.one * from; }
         public void Debris(Vector3 initialVelocity, float seconds)
         { mode = EffectMode.Debris; velocity = initialVelocity; duration = seconds; }
+        public void Mote(Vector3 initialVelocity, float seconds)
+        { mode = EffectMode.Mote; velocity = initialVelocity; duration = seconds; }
 
         private void Update()
         {
@@ -266,11 +327,17 @@ namespace Hearthhold.UnityClient
                 transform.localScale = new Vector3(scale, 1, scale);
                 transform.Rotate(0, Time.deltaTime * 90, 0);
             }
-            else
+            else if (mode == EffectMode.Debris)
             {
                 velocity += Vector3.down * 7.5f * Time.deltaTime;
                 transform.position += velocity * Time.deltaTime;
                 transform.Rotate(180 * Time.deltaTime, 260 * Time.deltaTime, 110 * Time.deltaTime);
+            }
+            else
+            {
+                transform.position += velocity * Time.deltaTime;
+                transform.Rotate(0, 150 * Time.deltaTime, 0);
+                transform.localScale *= 1 - Time.deltaTime * 0.55f;
             }
             if (elapsed >= duration) Destroy(gameObject);
         }

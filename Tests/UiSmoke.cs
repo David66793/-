@@ -86,6 +86,15 @@ internal static class UiSmoke
                 Check(session.Village.HasClaimed("builder"), "Ready achievement reward can be claimed from campaign panel");
                 Click(game, 720, 726);
                 Check(!(bool)typeof(GameWindow).GetField("showCampaign", Hidden).GetValue(game), "Campaign panel can be dismissed");
+                Key(game, Keys.T); Render(game, "26-native-training-v06");
+                Check((bool)typeof(GameWindow).GetField("showTraining", Hidden).GetValue(game), "T opens formation and training panel");
+                int trainingGold = session.Village.Gold;
+                Click(game, 415, 477);
+                Check(session.Village.TrainingQueue.Count == 1 && session.Village.Gold == trainingGold - Rules.Spec(TroopKind.Vanguard).TrainCost, "Visible training button queues a troop and spends its cost");
+                Click(game, 400, 633);
+                Check(session.Village.TrainingQueue.Count == 0 && session.Village.Gold == trainingGold, "Visible cancel button removes queued training and refunds cost");
+                Click(game, 950, 633);
+                Check(!(bool)typeof(GameWindow).GetField("showTraining", Hidden).GetValue(game), "Formation panel can be dismissed");
                 Key(game, Keys.F1); Render(game, "08-help");
                 Click(game, 720, 657);
                 Check(!(bool)typeof(GameWindow).GetField("showHelp", Hidden).GetValue(game), "Help modal can be dismissed");

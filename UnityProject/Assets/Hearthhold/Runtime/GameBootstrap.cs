@@ -17,7 +17,7 @@ namespace Hearthhold.UnityClient
         private readonly Dictionary<int, GameObject> unitViews = new Dictionary<int, GameObject>();
         private readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>();
         private string savePath, fatalError, smokeCapturePath;
-        private bool smokeBattle, smokeCampaign;
+        private bool smokeBattle, smokeCampaign, smokeTraining;
         private DateTime smokeRequestedUtc;
         private int smokeFrames;
         private int selected = -1, moving = -1;
@@ -43,6 +43,7 @@ namespace Hearthhold.UnityClient
             smokeCapturePath = CommandLineValue("-hearthhold-smoke");
             smokeBattle = HasCommandLineFlag("-hearthhold-smoke-battle");
             smokeCampaign = HasCommandLineFlag("-hearthhold-smoke-campaign");
+            smokeTraining = HasCommandLineFlag("-hearthhold-smoke-training");
             if (!string.IsNullOrEmpty(smokeCapturePath))
             {
                 Application.runInBackground = true;
@@ -63,18 +64,24 @@ namespace Hearthhold.UnityClient
             unitsRoot = new GameObject("Units").transform;
             worldCamera = new GameObject("Isometric camera").AddComponent<Camera>();
             worldCamera.orthographic = true;
-            worldCamera.orthographicSize = 24;
+            worldCamera.orthographicSize = 21.5f;
             worldCamera.clearFlags = CameraClearFlags.SolidColor;
-            worldCamera.backgroundColor = new Color32(49, 97, 98, 255);
+            worldCamera.backgroundColor = new Color32(38, 72, 74, 255);
             worldCamera.nearClipPlane = 0.1f;
             worldCamera.farClipPlane = 200;
             worldCamera.transform.rotation = Quaternion.Euler(45, 45, 0);
             MoveCamera();
             Light sun = new GameObject("Afternoon sun").AddComponent<Light>();
-            sun.type = LightType.Directional; sun.intensity = 1.5f;
-            sun.transform.rotation = Quaternion.Euler(50, -35, 0);
-            sun.shadows = LightShadows.Soft;
-            RenderSettings.ambientLight = new Color(0.63f, 0.7f, 0.66f);
+            sun.type = LightType.Directional; sun.intensity = 1.25f; sun.color = new Color32(255, 225, 181, 255);
+            sun.transform.rotation = Quaternion.Euler(48, -38, 0);
+            sun.shadows = LightShadows.Soft; sun.shadowStrength = 0.82f;
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color32(116, 143, 146, 255);
+            RenderSettings.ambientEquatorColor = new Color32(82, 105, 94, 255);
+            RenderSettings.ambientGroundColor = new Color32(45, 55, 47, 255);
+            Light fill = new GameObject("Cool fill").AddComponent<Light>();
+            fill.type = LightType.Directional; fill.intensity = 0.24f; fill.color = new Color32(143, 205, 211, 255);
+            fill.transform.rotation = Quaternion.Euler(62, 142, 0); fill.shadows = LightShadows.None;
             MakeIsland();
             placement = Piece("Placement", PrimitiveType.Cube, Vector3.zero, new Vector3(1, 0.07f, 1), Mint, transform);
             placement.SetActive(false);
@@ -82,6 +89,7 @@ namespace Hearthhold.UnityClient
             RebuildBuildings();
             if (smokeBattle) PrepareBattleSmoke();
             else if (smokeCampaign) PrepareCampaignSmoke();
+            else if (smokeTraining) PrepareTrainingSmoke();
             else if (!string.IsNullOrEmpty(smokeCapturePath)) PrepareHomeSmoke();
             uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei UI", "Microsoft YaHei", "Arial" }, 16);
         }
@@ -140,11 +148,11 @@ namespace Hearthhold.UnityClient
         }
         private void MakeIsland()
         {
-            Piece("River", PrimitiveType.Cube, new Vector3(20, -1.2f, 20), new Vector3(95, 0.1f, 95), new Color32(49, 105, 108, 255), sceneryRoot);
-            Piece("Island cliff", PrimitiveType.Cube, new Vector3(20, -0.65f, 20), new Vector3(40.6f, 1.2f, 40.6f), new Color32(106, 115, 84, 255), sceneryRoot);
-            Piece("Meadow", PrimitiveType.Cube, new Vector3(20, -0.08f, 20), new Vector3(40, 0.15f, 40), new Color32(132, 163, 91, 255), sceneryRoot);
-            Piece("East road", PrimitiveType.Cube, new Vector3(20.5f, 0.012f, 23.5f), new Vector3(19, 0.03f, 1), new Color32(173, 164, 116, 255), sceneryRoot);
-            Piece("North road", PrimitiveType.Cube, new Vector3(20.5f, 0.012f, 19.5f), new Vector3(1, 0.03f, 18), new Color32(173, 164, 116, 255), sceneryRoot);
+            Piece("River", PrimitiveType.Cube, new Vector3(20, -1.2f, 20), new Vector3(95, 0.1f, 95), new Color32(50, 91, 96, 255), sceneryRoot);
+            Piece("Island cliff", PrimitiveType.Cube, new Vector3(20, -0.65f, 20), new Vector3(40.6f, 1.2f, 40.6f), new Color32(102, 101, 76, 255), sceneryRoot);
+            Piece("Meadow", PrimitiveType.Cube, new Vector3(20, -0.08f, 20), new Vector3(40, 0.15f, 40), new Color32(116, 142, 82, 255), sceneryRoot);
+            Piece("East road", PrimitiveType.Cube, new Vector3(20.5f, 0.012f, 23.5f), new Vector3(19, 0.03f, 1), new Color32(168, 151, 104, 255), sceneryRoot);
+            Piece("North road", PrimitiveType.Cube, new Vector3(20.5f, 0.012f, 19.5f), new Vector3(1, 0.03f, 18), new Color32(168, 151, 104, 255), sceneryRoot);
             for (int i = 0; i < 76; i++)
             {
                 float t = i % 19 * 2.15f;
@@ -188,10 +196,12 @@ namespace Hearthhold.UnityClient
         private void DestroyBuildingView(GameObject obj) { Destroy(obj); }
         private void Update()
         {
-            if (session == null) return;
+            if (session == null || session.Battle != null && !session.Battle.Settled) return;
+            if (session.AdvanceTraining(DateTime.UtcNow)) Save();
             if (Input.GetKeyDown(KeyCode.F1)) help = !help;
             if (Input.GetKeyDown(KeyCode.Escape)) { help = false; buildKind = null; moving = -1; heal = false; selected = -1; CloseExtraModals(); }
             if (Input.GetKeyDown(KeyCode.I) && demolishId < 0 && !showBrief) showArmyGuide = !showArmyGuide;
+            if (Input.GetKeyDown(KeyCode.T) && session.Battle == null && demolishId < 0) showTraining = !showTraining;
             if (Input.GetKeyDown(KeyCode.F11)) Screen.fullScreen = !Screen.fullScreen;
             if (help || ExtraModal) return;
             float dt = Mathf.Min(Time.deltaTime, 0.2f);
@@ -211,7 +221,7 @@ namespace Hearthhold.UnityClient
                 focus -= (right * delta.x + forward * delta.y) * worldCamera.orthographicSize / Screen.height * 2;
             }
             worldCamera.orthographicSize = Mathf.Clamp(worldCamera.orthographicSize - Input.mouseScrollDelta.y * 1.5f, 8, 38);
-            if (Input.GetKeyDown(KeyCode.Home)) { focus = new Vector3(20, 0, 20); worldCamera.orthographicSize = 24; }
+            if (Input.GetKeyDown(KeyCode.Home)) { focus = new Vector3(20, 0, 20); worldCamera.orthographicSize = session.Battle == null ? 21.5f : 24; }
             MoveCamera();
             if (Input.GetMouseButtonDown(1)) { buildKind = null; moving = -1; heal = false; selected = -1; }
             if (session.Battle != null)
@@ -309,7 +319,7 @@ namespace Hearthhold.UnityClient
             if (session == null) return;
             try { SaveStore.Save(savePath, session.Village); } catch (Exception ex) { session.Notice = "保存失败：" + ex.Message; Debug.LogError(ex); }
         }
-        private void OnApplicationQuit() { Save(); }
+        private void OnApplicationQuit() { if (session != null && session.Battle != null && !session.Battle.Settled) session.AbandonBattle(); Save(); }
         private void OnApplicationPause(bool pause) { if (pause) Save(); }
         private void OnDestroy()
         {
@@ -323,11 +333,16 @@ namespace Hearthhold.UnityClient
         {
             selected = moving = -1; buildKind = null; heal = false;
             session.BeginBattle(); accumulator = 0; RebuildBuildings();
-            if (session.Battle != null && !briefSeen) showBrief = true;
+            if (session.Battle != null)
+            {
+                focus = new Vector3(20, 0, 20); worldCamera.orthographicSize = 24; MoveCamera();
+                if (!briefSeen) showBrief = true;
+            }
         }
         private void ReturnHome()
         {
             session.ReturnHome(); selected = moving = -1; buildKind = null; heal = false;
+            focus = new Vector3(20, 0, 20); worldCamera.orthographicSize = 21.5f; MoveCamera();
             RebuildBuildings(); Save();
         }
         private void OnGUI()
@@ -347,7 +362,7 @@ namespace Hearthhold.UnityClient
             GUI.Label(new Rect(24, 17, 310, 42), "篝火堡垒  HEARTHHOLD", heading);
             GUI.Label(new Rect(Screen.width - 505, 23, 365, 35), "金币 " + session.Village.Gold + "    晶露 " + session.Village.Crystal, label);
             if (GUI.Button(new Rect(Screen.width - 118, 21, 94, 40), "帮助 F1")) help = true;
-            Box(new Rect(20, 112, 225, 235));
+            Box(new Rect(20, 112, 225, session.Battle == null ? 276 : 235));
             if (session.Battle == null)
             {
                 GUI.Label(new Rect(36, 132, 200, 36), "你的聚落", heading);
@@ -356,6 +371,7 @@ namespace Hearthhold.UnityClient
                 if (GUI.Button(new Rect(35, 252, 194, 44), "收取 " + gold + " 金 / " + crystal + " 晶")) { session.Collect(DateTime.UtcNow); Save(); }
                 if (GUI.Button(new Rect(35, 304, 93, 32), "兵种 I")) showArmyGuide = true;
                 if (GUI.Button(new Rect(136, 304, 93, 32), "战役 / 成就")) showCampaign = true;
+                if (GUI.Button(new Rect(35, 344, 194, 32), "编队 / 训练  T")) showTraining = true;
             }
             else
             {
@@ -401,8 +417,10 @@ namespace Hearthhold.UnityClient
                 bool unlocked = session.Village.IsMissionUnlocked(session.MissionIndex);
                 GUI.Label(new Rect(Screen.width - 230, Screen.height - 108, 205, 24), unlocked ? "★ " + session.Village.CampaignStars[session.MissionIndex] + "/3  ·  最佳 " + session.Village.CampaignBest[session.MissionIndex] + "%" : "尚未解锁", small);
                 if (GUI.Button(new Rect(Screen.width - 54, Screen.height - 130, 32, 30), ">")) session.CycleMission(1);
-                bool previousEnabled = GUI.enabled; GUI.enabled = previousEnabled && unlocked;
-                if (GUI.Button(new Rect(Screen.width - 277, Screen.height - 82, 255, 33), unlocked ? "出发远征 →" : "先通关上一关")) BeginBattle();
+                bool armyReady = session.Village.ArmyHousing > 0;
+                bool previousEnabled = GUI.enabled; GUI.enabled = previousEnabled && unlocked && armyReady;
+                string battleLabel = !unlocked ? "先通关上一关" : armyReady ? "出发远征 →  " + session.Village.ArmyHousing + "营位" : "先编队训练士兵";
+                if (GUI.Button(new Rect(Screen.width - 277, Screen.height - 82, 255, 33), battleLabel)) BeginBattle();
                 GUI.enabled = previousEnabled;
             }
             else
@@ -435,7 +453,7 @@ namespace Hearthhold.UnityClient
                 float x = Screen.width / 2f - 270, y = Screen.height / 2f - 190;
                 Box(new Rect(x, y, 540, 380));
                 GUI.Label(new Rect(x + 25, y + 24, 480, 45), "指挥官手册 · 已暂停", heading);
-                GUI.Label(new Rect(x + 25, y + 82, 490, 220), "选择底部建筑，再点击空地建造。\n点击建筑：M 移动，U 升级，Del 拆除。\n升级议事堡可提升等级和建造数量上限。\n按 I 查看兵种图鉴、职责与投放顺序。\n远征在外围投兵，按 1—4 切换兵种。\nQ 选择治疗，点击友军附近恢复生命。\n本地进度每15秒保存。", label);
+                GUI.Label(new Rect(x + 25, y + 82, 490, 220), "选择底部建筑，再点击空地建造。\n点击建筑：M 移动，U 升级，Del 拆除。\n升级议事堡可提升等级和建造数量上限。\n按 T 打开编队训练，按 I 查看兵种图鉴。\n远征在外围投兵，按 1—4 切换兵种。\nQ 选择治疗，点击友军附近恢复生命。\n本地进度每15秒保存。", label);
                 if (GUI.Button(new Rect(x + 25, y + 315, 490, 42), "继续游戏")) help = false;
             }
             DrawExtraModals();
