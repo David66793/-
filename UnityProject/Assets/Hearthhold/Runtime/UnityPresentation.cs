@@ -9,7 +9,7 @@ namespace Hearthhold.UnityClient
         private static readonly Color Danger = new Color32(235, 91, 78, 255);
         private static readonly Color Ember = new Color32(255, 139, 67, 255);
         private readonly HashSet<CombatEffect> presentedEffects = new HashSet<CombatEffect>();
-        private GameObject selectionMarker, placementPreview;
+        private GameObject selectionMarker, deploymentMarker, placementPreview;
         private BuildingKind? placementPreviewKind;
         private int placementPreviewLevel;
         private Transform effectsRoot, deploymentRoot;
@@ -20,15 +20,17 @@ namespace Hearthhold.UnityClient
             ringMesh = MakeRingMesh();
             selectionMarker = Ring("Selected building", Gold, transform);
             selectionMarker.SetActive(false);
+            deploymentMarker = Ring("Nearest deployment point", Mint, transform);
+            deploymentMarker.SetActive(false);
             effectsRoot = new GameObject("Battle effects").transform;
             effectsRoot.SetParent(transform, false);
             deploymentRoot = new GameObject("Deployment boundary").transform;
             deploymentRoot.SetParent(sceneryRoot, false);
-            Color boundary = new Color32(226, 150, 73, 255);
-            Piece("South deployment line", PrimitiveType.Cube, new Vector3(20.5f, 0.07f, 10.5f), new Vector3(20, 0.05f, 0.12f), boundary, deploymentRoot);
-            Piece("North deployment line", PrimitiveType.Cube, new Vector3(20.5f, 0.07f, 31.5f), new Vector3(20, 0.05f, 0.12f), boundary, deploymentRoot);
-            Piece("West deployment line", PrimitiveType.Cube, new Vector3(10.5f, 0.07f, 21), new Vector3(0.12f, 0.05f, 21), boundary, deploymentRoot);
-            Piece("East deployment line", PrimitiveType.Cube, new Vector3(30.5f, 0.07f, 21), new Vector3(0.12f, 0.05f, 21), boundary, deploymentRoot);
+            Color boundary = new Color32(102, 232, 173, 255);
+            Piece("South deployment line", PrimitiveType.Cube, new Vector3(20.5f, 0.07f, 10.5f), new Vector3(20, 0.05f, 0.2f), boundary, deploymentRoot);
+            Piece("North deployment line", PrimitiveType.Cube, new Vector3(20.5f, 0.07f, 31.5f), new Vector3(20, 0.05f, 0.2f), boundary, deploymentRoot);
+            Piece("West deployment line", PrimitiveType.Cube, new Vector3(10.5f, 0.07f, 21), new Vector3(0.2f, 0.05f, 21), boundary, deploymentRoot);
+            Piece("East deployment line", PrimitiveType.Cube, new Vector3(30.5f, 0.07f, 21), new Vector3(0.2f, 0.05f, 21), boundary, deploymentRoot);
             deploymentRoot.gameObject.SetActive(false);
         }
 
@@ -74,6 +76,17 @@ namespace Hearthhold.UnityClient
             selectionMarker.transform.position = new Vector3(building.X + building.Spec.Size / 2f, 0.08f, building.Z + building.Spec.Size / 2f);
             selectionMarker.transform.localScale = new Vector3(diameter, 1, diameter);
         }
+        private void UpdateDeploymentPresentation()
+        {
+            bool active = session.Battle != null && !session.Battle.Finished && !heal && !OverHud();
+            Vector3 point; int x = 0, z = 0;
+            active = active && GroundPoint(out point) && session.Battle.NearestDeployment(Mathf.FloorToInt(point.x) * 1000 + 500, Mathf.FloorToInt(point.z) * 1000 + 500, out x, out z);
+            deploymentMarker.SetActive(active);
+            if (!active) return;
+            float pulse = 1.35f + Mathf.Sin(Time.unscaledTime * 7) * 0.12f;
+            deploymentMarker.transform.position = new Vector3(x / 1000f, 0.1f, z / 1000f);
+            deploymentMarker.transform.localScale = new Vector3(pulse, 1, pulse);
+        }
 
         private void ShowPlacementPresentation(BuildingKind kind, int level, int x, int z, int size, bool valid)
         {
@@ -106,6 +119,7 @@ namespace Hearthhold.UnityClient
             if (effectsRoot != null) for (int i = effectsRoot.childCount - 1; i >= 0; i--) Destroy(effectsRoot.GetChild(i).gameObject);
             if (deploymentRoot != null) deploymentRoot.gameObject.SetActive(session.Battle != null);
             if (selectionMarker != null) selectionMarker.SetActive(false);
+            if (deploymentMarker != null) deploymentMarker.SetActive(false);
             HidePlacementPresentation();
         }
 
@@ -257,13 +271,41 @@ namespace Hearthhold.UnityClient
             if (session.Battle == null) return;
             showBrief = false; briefSeen = true;
             RebuildBuildings();
+            troop = TroopKind.Guardian;
+            int before = session.Battle.Units.Count;
+            if (!TryBattleActionAt(20, 20) || session.Battle.Units.Count != before + 1 || !session.Battle.CanDeploy(session.Battle.Units[before].X, session.Battle.Units[before].Z))
+            {
+                Debug.LogError("HEARTHHOLD_DEPLOY_SMOKE_FAILED: central battlefield click did not reach a legal deployment cell.");
+                Application.Quit(4);
+                return;
+            }
+            Debug.Log("HEARTHHOLD_DEPLOY_SMOKE_READY: central battlefield click snapped to a legal deployment cell.");
             int[] rows = { 17500, 19500, 21500, 23500 };
             for (int i = 0; i < 2; i++) session.Battle.Deploy(TroopKind.Guardian, 9500, rows[i]);
             for (int i = 0; i < 3; i++) session.Battle.Deploy(TroopKind.Sapper, 9500, 20500 + i * 700);
             for (int i = 0; i < 5; i++) session.Battle.Deploy(TroopKind.Vanguard, 9000, 17500 + i * 1200);
             for (int i = 0; i < 5; i++) session.Battle.Deploy(TroopKind.Ranger, 7500, 17000 + i * 1400);
             for (int i = 0; i < 240 && !session.Battle.Finished; i++) session.Battle.Step();
-            session.Notice = "0.6 战斗视觉验收：分型弹道、命中火花、烟尘与建筑反击。";
+            session.Notice = "0.6.1 战斗验收：全图点击吸附部署、新兵种美术与分型特效。";
+        }
+
+        private void PrepareDeploySmoke()
+        {
+            session.MissionIndex = 0;
+            session.BeginBattle();
+            if (session.Battle == null) return;
+            showBrief = false; briefSeen = true;
+            RebuildBuildings();
+            focus = new Vector3(20, 0, 20); worldCamera.orthographicSize = 24; MoveCamera();
+            troop = TroopKind.Guardian;
+            if (!TryBattleActionAt(20, 20) || session.Battle.Units.Count != 1 || !session.Battle.CanDeploy(session.Battle.Units[0].X, session.Battle.Units[0].Z))
+            {
+                Debug.LogError("HEARTHHOLD_DEPLOY_SMOKE_FAILED: central battlefield click did not reach a legal deployment cell.");
+                Application.Quit(4);
+                return;
+            }
+            Debug.Log("HEARTHHOLD_DEPLOY_SMOKE_READY: central battlefield click snapped to a legal deployment cell.");
+            session.Notice = "0.6.1 投兵验收：点击基地中心，铁卫已自动从最近绿色战线入场。";
         }
 
         private void PrepareCampaignSmoke()
@@ -274,7 +316,7 @@ namespace Hearthhold.UnityClient
             session.Village.Wins = 3;
             session.MissionIndex = 3;
             selected = -1; showCampaign = true;
-            session.Notice = "0.6 战役进度验收：逐关解锁、最佳纪录与成就奖励。";
+            session.Notice = "0.6.1 战役进度验收：逐关解锁、最佳纪录与成就奖励。";
         }
 
         private void PrepareTrainingSmoke()
@@ -283,14 +325,14 @@ namespace Hearthhold.UnityClient
             session.QueueTroop(TroopKind.Vanguard, System.DateTime.UtcNow);
             session.QueueTroop(TroopKind.Vanguard, System.DateTime.UtcNow);
             selected = -1; showTraining = true;
-            session.Notice = "0.6 编队验收：营位、训练成本、队列与三种战术预设。";
+            session.Notice = "0.6.1 编队验收：营位、训练成本、队列与三种战术预设。";
         }
 
         private void PrepareHomeSmoke()
         {
             foreach (Building building in session.Village.Buildings)
                 if (building.Kind == BuildingKind.Keep) { selected = building.Id; break; }
-            session.Notice = "0.6 聚落验收：训练入口、旧存档兼容与建造信息。";
+            session.Notice = "0.6.1 聚落验收：新建筑画面、旧存档兼容与建造信息。";
         }
 
         private void DisposePresentation()
@@ -345,7 +387,7 @@ namespace Hearthhold.UnityClient
 
     internal sealed class ModelHitFlash : MonoBehaviour
     {
-        private Renderer target;
+        private Renderer[] targets;
         private MaterialPropertyBlock properties;
         private Color color;
         private float remaining;
@@ -353,20 +395,26 @@ namespace Hearthhold.UnityClient
         private void Update()
         {
             if (remaining <= 0) return;
-            if (target == null) target = GetComponent<Renderer>();
-            if (target == null) return;
+            if (targets == null) targets = GetComponentsInChildren<Renderer>();
+            if (targets.Length == 0) return;
             if (properties == null) properties = new MaterialPropertyBlock();
             remaining = Mathf.Max(0, remaining - Time.deltaTime);
             float strength = Mathf.Sin(remaining / 0.2f * Mathf.PI);
-            target.GetPropertyBlock(properties);
-            properties.SetColor("_BaseColor", Color.Lerp(Color.white, color, strength * 0.8f));
-            target.SetPropertyBlock(properties);
+            foreach (Renderer target in targets)
+            {
+                target.GetPropertyBlock(properties);
+                properties.SetColor("_BaseColor", Color.Lerp(Color.white, color, strength * 0.8f));
+                target.SetPropertyBlock(properties);
+            }
         }
         private void OnDisable()
         {
-            if (target == null) return;
+            if (targets == null) return;
             if (properties == null) properties = new MaterialPropertyBlock();
-            target.GetPropertyBlock(properties); properties.SetColor("_BaseColor", Color.white); target.SetPropertyBlock(properties);
+            foreach (Renderer target in targets)
+            {
+                target.GetPropertyBlock(properties); properties.SetColor("_BaseColor", Color.white); target.SetPropertyBlock(properties);
+            }
             remaining = 0;
         }
     }

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('All', 'Home', 'Campaign', 'Training', 'Battle')][string]$Case = 'All',
+    [ValidateSet('All', 'Home', 'Campaign', 'Training', 'Battle', 'Deploy')][string]$Case = 'All',
     [string]$PlayerPath = ''
 )
 $ErrorActionPreference = 'Stop'
@@ -20,6 +20,7 @@ function Invoke-HearthholdSmoke([string]$Name, [string]$FileName, [string]$Mode)
         '-hearthhold-smoke', ('"' + $taskShot + '"')
     )
     if ($Mode -eq 'Battle') { $taskArguments += '-hearthhold-smoke-battle' }
+    if ($Mode -eq 'Deploy') { $taskArguments += '-hearthhold-smoke-deploy' }
     if ($Mode -eq 'Campaign') { $taskArguments += '-hearthhold-smoke-campaign' }
     if ($Mode -eq 'Training') { $taskArguments += '-hearthhold-smoke-training' }
     $taskArguments += @('-logFile', ('"' + $taskLog + '"'))
@@ -31,11 +32,14 @@ function Invoke-HearthholdSmoke([string]$Name, [string]$FileName, [string]$Mode)
     $taskImage = Get-Item -LiteralPath $taskShot
     if ($taskImage.Length -le 1024 -or $taskImage.LastWriteTimeUtc -lt $taskStarted.AddSeconds(-1)) { throw ($Name + ' smoke screenshot is empty or stale: ' + $taskShot) }
     if (-not (Select-String -LiteralPath $taskLog -Pattern 'HEARTHHOLD_SMOKE_READY:' -SimpleMatch -Quiet)) { throw ($Name + ' log has no completion marker: ' + $taskLog) }
+    if (($Mode -eq 'Battle' -or $Mode -eq 'Deploy') -and -not (Select-String -LiteralPath $taskLog -Pattern 'HEARTHHOLD_DEPLOY_SMOKE_READY:' -SimpleMatch -Quiet)) { throw ($Name + ' log has no successful central-click deployment marker: ' + $taskLog) }
+    if ($Mode -eq 'Deploy' -and -not (Select-String -LiteralPath $taskLog -Pattern 'HEARTHHOLD_DEPLOY_VISUAL_READY:' -SimpleMatch -Quiet)) { throw ($Name + ' log has no synchronized deployed-unit visual marker: ' + $taskLog) }
     if (Select-String -LiteralPath $taskLog -Pattern 'NullReferenceException|MissingReferenceException|Shader error|HEARTHHOLD_SMOKE_TIMEOUT' -Quiet) { throw ($Name + ' log contains a runtime or rendering error: ' + $taskLog) }
     Write-Output ($Name + ' smoke test passed: ' + $taskShot + ' (' + $taskImage.Length + ' bytes)')
 }
 
-if ($Case -eq 'All' -or $Case -eq 'Home') { Invoke-HearthholdSmoke 'home-v06' '27-unity-home-v06.png' 'Home' }
-if ($Case -eq 'All' -or $Case -eq 'Campaign') { Invoke-HearthholdSmoke 'campaign-v06' '28-unity-campaign-v06.png' 'Campaign' }
-if ($Case -eq 'All' -or $Case -eq 'Training') { Invoke-HearthholdSmoke 'training-v06' '29-unity-training-v06.png' 'Training' }
-if ($Case -eq 'All' -or $Case -eq 'Battle') { Invoke-HearthholdSmoke 'battle-v06' '30-unity-battle-v06.png' 'Battle' }
+if ($Case -eq 'All' -or $Case -eq 'Home') { Invoke-HearthholdSmoke 'home-v061' '31-unity-home-v061.png' 'Home' }
+if ($Case -eq 'All' -or $Case -eq 'Campaign') { Invoke-HearthholdSmoke 'campaign-v061' '32-unity-campaign-v061.png' 'Campaign' }
+if ($Case -eq 'All' -or $Case -eq 'Training') { Invoke-HearthholdSmoke 'training-v061' '33-unity-training-v061.png' 'Training' }
+if ($Case -eq 'All' -or $Case -eq 'Battle') { Invoke-HearthholdSmoke 'battle-v061' '34-unity-battle-v061.png' 'Battle' }
+if ($Case -eq 'All' -or $Case -eq 'Deploy') { Invoke-HearthholdSmoke 'deploy-v061' '35-unity-deploy-v061.png' 'Deploy' }

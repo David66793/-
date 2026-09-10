@@ -23,6 +23,13 @@ namespace Hearthhold.Editor
         [MenuItem("Hearthhold/Prepare project")]
         public static void Prepare()
         {
+            ConfigureGeneratedTexture("Assets/Hearthhold/Resources/GeneratedArt/KeepV061.png");
+            ConfigureGeneratedTexture("Assets/Hearthhold/Resources/GeneratedArt/MineV061.png");
+            ConfigureGeneratedTexture("Assets/Hearthhold/Resources/GeneratedArt/ReservoirV061.png");
+            ConfigureGeneratedTexture("Assets/Hearthhold/Resources/GeneratedArt/BarracksV061.png");
+            ConfigureGeneratedTexture("Assets/Hearthhold/Resources/GeneratedArt/CannonV061.png");
+            ConfigureGeneratedTexture("Assets/Hearthhold/Resources/GeneratedArt/WatchtowerV061.png");
+            ConfigureGeneratedTexture("Assets/Hearthhold/Resources/GeneratedArt/TroopAtlasV061.png");
             Directory.CreateDirectory("Assets/Hearthhold/Settings");
             Directory.CreateDirectory("Assets/Hearthhold/Resources");
             Directory.CreateDirectory("Assets/Hearthhold/Scenes");
@@ -51,9 +58,15 @@ namespace Hearthhold.Editor
                 material.SetFloat("_Smoothness", 0.12f);
                 AssetDatabase.CreateAsset(material, "Assets/Hearthhold/Resources/WorldPalette.mat");
             }
+            if (AssetDatabase.LoadAssetAtPath<Material>("Assets/Hearthhold/Resources/GeneratedSpritePalette.mat") == null)
+            {
+                Shader shader = Shader.Find("Hearthhold/ChromaKeySprite");
+                if (shader == null) throw new BuildFailedException("Hearthhold/ChromaKeySprite shader failed to import.");
+                AssetDatabase.CreateAsset(new Material(shader), "Assets/Hearthhold/Resources/GeneratedSpritePalette.mat");
+            }
             PlayerSettings.companyName = "Hearthhold Studio";
             PlayerSettings.productName = "Hearthhold";
-            PlayerSettings.bundleVersion = "0.6.0-preview";
+            PlayerSettings.bundleVersion = "0.6.1-preview";
             PlayerSettings.defaultScreenWidth = 1440;
             PlayerSettings.defaultScreenHeight = 900;
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
@@ -82,6 +95,20 @@ namespace Hearthhold.Editor
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Hearthhold/Scenes/Main.unity", true) };
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+        }
+
+        private static void ConfigureGeneratedTexture(string path)
+        {
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (importer == null) return;
+            bool changed = importer.textureCompression != TextureImporterCompression.Uncompressed || importer.mipmapEnabled || importer.wrapMode != TextureWrapMode.Clamp || importer.maxTextureSize < 2048;
+            if (!changed) return;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.mipmapEnabled = false;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.filterMode = FilterMode.Bilinear;
+            importer.maxTextureSize = 2048;
+            importer.SaveAndReimport();
         }
 
         [MenuItem("Hearthhold/Open main scene")]

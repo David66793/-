@@ -184,11 +184,12 @@ internal static class CoreTests
         GameSession session = NewSession(); session.BeginBattle(); Battle b = session.Battle;
         int countBefore = b.Available[0];
         Check(!b.Deploy(TroopKind.Vanguard, 20000, 20000) && b.Available[0] == countBefore, "No deployment inside protected area");
+        Check(b.DeployNearest(TroopKind.Vanguard, 20000, 20000) && b.Available[0] == countBefore - 1 && b.CanDeploy(b.Units[0].X, b.Units[0].Z), "Central battlefield click snaps to the nearest legal deployment cell");
         Check(!b.Deploy(TroopKind.Vanguard, -100, 1000), "Reject out-of-map deployment");
-        b.Step(); Check(b.TickNumber == 0, "Scouting does not consume battle time");
-        Check(!b.CastHeal(1000, 1000) && b.SpellCharges == 2, "Cannot waste a spell before battle");
+        Battle scout = new Battle(0); scout.Step(); Check(scout.TickNumber == 0, "Scouting does not consume battle time");
+        Check(!scout.CastHeal(1000, 1000) && scout.SpellCharges == 2, "Cannot waste a spell before battle");
         Check(b.Deploy(TroopKind.Vanguard, 10500, 20500), "Deploy from outer boundary");
-        Check(b.Available[0] == countBefore - 1 && b.Started, "Deployment consumes one soldier and starts timer");
+        Check(b.Available[0] == countBefore - 2 && b.Started, "Deployment consumes one soldier and starts timer");
         Check(!session.Build(BuildingKind.Cannon, 5, 5), "Village cannot mutate during battle");
         Unit u = b.Units[0]; u.Health = 1;
         Check(b.CastHeal(u.X, u.Z) && u.Health > 1, "Healing restores nearby living soldiers");

@@ -257,8 +257,8 @@ namespace Hearthhold.Core
             BevelBox(m, 0.12f, 0.31f, 0.12f, 0.76f, h, 0.76f, 0.045f, Stone);
             Masonry(m, 0.12f, 0.35f, 0.12f, 0.76f, h - 0.07f, 0.76f);
             BevelBox(m, 0.05f, h + 0.3f, 0.05f, 0.9f, 0.17f, 0.9f, 0.04f, LightStone);
-            for (int i = 0; i < 2; i++) BevelBox(m, 0.08f + i * 0.56f, h + 0.46f, 0.08f, 0.28f, 0.27f, 0.83f, 0.025f, level >= 3 ? Metal : Stone);
-            if (level >= 2) Box(m, 0.16f, h * 0.5f + 0.34f, 0.9f, 0.68f, 0.09f, 0.035f, Brass);
+            for (int i = 0; i < 2; i++) BevelBox(m, 0.08f + i * 0.56f, h + 0.46f, 0.08f, 0.28f, 0.27f, 0.83f, 0.025f, LightStone);
+            if (level >= 2) Box(m, 0.16f, h * 0.5f + 0.34f, 0.9f, 0.68f, 0.09f, 0.035f, Teal);
         }
         private static void TimberFrame(ModelMesh m, float x, float y, float z, float sx, float h, float sz)
         {

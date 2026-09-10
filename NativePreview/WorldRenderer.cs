@@ -106,7 +106,12 @@ namespace Hearthhold.Preview
                 {
                     Cell cell = Unproject(mouse);
                     if (heal) DrawRange(g, cell.X + 0.5f, cell.Z + 0.5f, 5, Mint, 2);
-                    else GroundPoly(g, Color.FromArgb(105, battle.CanDeploy(cell.X * 1000 + 500, cell.Z * 1000 + 500) ? Mint : Color.Salmon), cell.X, cell.Z, 1, 1, 2);
+                    else
+                    {
+                        int x, z;
+                        if (battle.NearestDeployment(cell.X * 1000 + 500, cell.Z * 1000 + 500, out x, out z))
+                            GroundPoly(g, Color.FromArgb(135, Mint), x / 1000, z / 1000, 1, 1, 2);
+                    }
                 }
             }
         }
@@ -150,10 +155,10 @@ namespace Hearthhold.Preview
         private void DrawDeployment(Graphics g)
         {
             PointF[] boundary = { Project(10.5f, 10.5f, 1), Project(30.5f, 10.5f, 1), Project(30.5f, 31.5f, 1), Project(10.5f, 31.5f, 1) };
-            Polygon(g, Color.FromArgb(20, 126, 35, 35), boundary);
-            using (Pen pen = new Pen(Color.FromArgb(205, 239, 147, 105), 2)) { pen.DashStyle = DashStyle.Dash; g.DrawPolygon(pen, boundary); }
+            Polygon(g, Color.FromArgb(18, 45, 105, 78), boundary);
+            using (Pen pen = new Pen(Color.FromArgb(225, Mint), 3)) { pen.DashStyle = DashStyle.Dash; g.DrawPolygon(pen, boundary); }
             PointF marker = Project(10, 25, 2);
-            TextAt(g, "← 外围投兵", marker.X - 91, marker.Y + 28, 12, Cream, true);
+            TextAt(g, "← 绿色战线 · 全图点击自动吸附", marker.X - 182, marker.Y + 28, 12, Cream, true);
         }
         private void DrawTree(Graphics g, float x, float z, int seed)
         {

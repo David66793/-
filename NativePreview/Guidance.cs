@@ -152,7 +152,7 @@ namespace Hearthhold.Preview
                 TextAt(g, verbs[i], cx + 15, y + 259, 15, Gold, true);
                 TextBox(g, tips[i], new RectangleF(cx + 15, y + 300, cw - 30, 70), 12, Cream);
             }
-            TextBox(g, "在虚线圈外点击投兵，按住可连续投放。首次投兵后才开始180秒计时。铁卫受伤时按Q，在友军附近释放治疗。", new RectangleF(x + 30, y + 404, width - 60, 58), 14, Cream);
+            TextBox(g, "点击战场任意地块，单位会自动吸附到最近的绿色战线；按住可连续投放。首次投兵后才开始180秒计时。铁卫受伤时按Q，在友军附近释放治疗。", new RectangleF(x + 30, y + 404, width - 60, 58), 14, Cream);
             TextAt(g, "胜利星级：摧毁议事堡 / 破坏率50% / 破坏率100%，各得一星。", x + 30, y + 466, 12, Muted, false);
             Button(g, "知道了，开始侦察", new RectangleF(x + 28, y + 510, width - 56, 40), delegate { showBattleBrief = false; battleBriefSeen = true; }, true, false);
         }

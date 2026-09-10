@@ -42,7 +42,7 @@ namespace Hearthhold.Preview
         public GameWindow(bool renderOnly)
         {
             preview = renderOnly;
-            Text = "篝火堡垒 · Hearthhold | Windows 可玩原型 0.6";
+            Text = "篝火堡垒 · Hearthhold | Windows 可玩原型 0.6.1";
             ClientSize = new Size(1440, 900);
             MinimumSize = new Size(1100, 760);
             StartPosition = FormStartPosition.CenterScreen;
@@ -133,9 +133,9 @@ namespace Hearthhold.Preview
             Cell c = Unproject(p);
             if (Session.Battle != null)
             {
-                bool success = heal ? Session.Battle.CastHeal(c.X * 1000 + 500, c.Z * 1000 + 500) : Session.Battle.Deploy(troopKind, c.X * 1000 + 500, c.Z * 1000 + 500);
-                if (success) { Session.Notice = heal ? "疗愈之雨 · 范围内友军恢复生命。" : Rules.Spec(troopKind).Name + "已加入战场。"; if (heal) { heal = false; leftDown = false; } }
-                else Session.Notice = heal ? "需要已开战、仍有法术次数且目标位于地图内。" : "请在外围部署区域投兵，并确认兵种余量。";
+                bool success = heal ? Session.Battle.CastHeal(c.X * 1000 + 500, c.Z * 1000 + 500) : Session.Battle.DeployNearest(troopKind, c.X * 1000 + 500, c.Z * 1000 + 500);
+                if (success) { Session.Notice = heal ? "疗愈之雨 · 范围内友军恢复生命。" : Rules.Spec(troopKind).Name + "已从最近战线入场。"; if (heal) { heal = false; leftDown = false; } }
+                else Session.Notice = heal ? "需要已开战、仍有法术次数且目标位于地图内。" : "该兵种已经没有余量。";
                 return;
             }
             if (movingId >= 0)
@@ -265,7 +265,7 @@ namespace Hearthhold.Preview
             DrawEmblem(g, 45, 43);
             TextAt(g, "篝火堡垒", 77, 16, 26, Cream, true);
             TextAt(g, "H E A R T H H O L D", 79, 52, 11, Gold, true);
-            TextAt(g, "WINDOWS 原型 / 0.6", 285, 39, 11, Muted, false);
+            TextAt(g, "WINDOWS 原型 / 0.6.1", 285, 39, 11, Muted, false);
             Resource(g, w - 660, 20, "金币", Session.Village.Gold, Gold, false);
             Resource(g, w - 448, 20, "晶露", Session.Village.Crystal, Mint, true);
             Button(g, "操作 / F1", new RectangleF(w - 232, 25, 95, 42), delegate { showHelp = !showHelp; }, false, showHelp);

@@ -69,8 +69,8 @@ internal static class UiSmoke
                 Check(!(bool)typeof(GameWindow).GetField("showBattleBrief", Hidden).GetValue(game), "Tutorial can be acknowledged before deployment");
                 Render(game, "04-scouting");
                 Key(game, Keys.D3);
-                ClickWorld(game, 10.25f, 22.25f, 0);
-                Check(session.Battle.Units.Count == 1 && session.Battle.Units[0].Kind == TroopKind.Guardian, "Hotkey plus deployment creates selected troop");
+                ClickWorld(game, 20.5f, 20.5f, 0);
+                Check(session.Battle.Units.Count == 1 && session.Battle.Units[0].Kind == TroopKind.Guardian && session.Battle.CanDeploy(session.Battle.Units[0].X, session.Battle.Units[0].Z), "Central map click snaps selected troop to a legal deployment cell");
                 for (int i = 0; i < 300; i++) session.Battle.Step();
                 Render(game, "05-battle");
                 Click(game, 1280, 819);

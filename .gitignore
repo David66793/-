@@ -26,6 +26,11 @@ artifacts/screenshots/*
 !artifacts/screenshots/28-unity-campaign-v06.png
 !artifacts/screenshots/29-unity-training-v06.png
 !artifacts/screenshots/30-unity-battle-v06.png
+!artifacts/screenshots/31-unity-home-v061.png
+!artifacts/screenshots/32-unity-campaign-v061.png
+!artifacts/screenshots/33-unity-training-v061.png
+!artifacts/screenshots/34-unity-battle-v061.png
+!artifacts/screenshots/35-unity-deploy-v061.png
 Saves/
 **/Saves/
 *.exe

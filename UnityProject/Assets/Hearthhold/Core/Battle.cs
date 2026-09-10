@@ -67,6 +67,27 @@ namespace Hearthhold.Core
             Started = true;
             return true;
         }
+        public bool NearestDeployment(int x, int z, out int deployX, out int deployZ)
+        {
+            deployX = deployZ = 0;
+            long best = long.MaxValue;
+            for (int cellX = 0; cellX < Rules.MapSize; cellX++)
+                for (int cellZ = 0; cellZ < Rules.MapSize; cellZ++)
+                {
+                    int candidateX = cellX * 1000 + 500, candidateZ = cellZ * 1000 + 500;
+                    if (!CanDeploy(candidateX, candidateZ)) continue;
+                    long dx = candidateX - x, dz = candidateZ - z, distance = dx * dx + dz * dz;
+                    if (distance >= best) continue;
+                    best = distance; deployX = candidateX; deployZ = candidateZ;
+                }
+            return best != long.MaxValue;
+        }
+        public bool DeployNearest(TroopKind kind, int x, int z)
+        {
+            if ((int)kind < 0 || (int)kind >= Available.Length || Available[(int)kind] <= 0) return false;
+            int deployX, deployZ;
+            return NearestDeployment(x, z, out deployX, out deployZ) && Deploy(kind, deployX, deployZ);
+        }
         public bool CastHeal(int x, int z)
         {
             if (!Started || Finished || SpellCharges <= 0 || x < 0 || z < 0 || x >= 40000 || z >= 40000) return false;

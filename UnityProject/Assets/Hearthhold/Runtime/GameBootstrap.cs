@@ -17,7 +17,7 @@ namespace Hearthhold.UnityClient
         private readonly Dictionary<int, GameObject> unitViews = new Dictionary<int, GameObject>();
         private readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>();
         private string savePath, fatalError, smokeCapturePath;
-        private bool smokeBattle, smokeCampaign, smokeTraining;
+        private bool smokeBattle, smokeCampaign, smokeTraining, smokeDeploy;
         private DateTime smokeRequestedUtc;
         private int smokeFrames;
         private int selected = -1, moving = -1;
@@ -44,6 +44,7 @@ namespace Hearthhold.UnityClient
             smokeBattle = HasCommandLineFlag("-hearthhold-smoke-battle");
             smokeCampaign = HasCommandLineFlag("-hearthhold-smoke-campaign");
             smokeTraining = HasCommandLineFlag("-hearthhold-smoke-training");
+            smokeDeploy = HasCommandLineFlag("-hearthhold-smoke-deploy");
             if (!string.IsNullOrEmpty(smokeCapturePath))
             {
                 Application.runInBackground = true;
@@ -87,7 +88,8 @@ namespace Hearthhold.UnityClient
             placement.SetActive(false);
             InitializePresentation();
             RebuildBuildings();
-            if (smokeBattle) PrepareBattleSmoke();
+            if (smokeDeploy) PrepareDeploySmoke();
+            else if (smokeBattle) PrepareBattleSmoke();
             else if (smokeCampaign) PrepareCampaignSmoke();
             else if (smokeTraining) PrepareTrainingSmoke();
             else if (!string.IsNullOrEmpty(smokeCapturePath)) PrepareHomeSmoke();
@@ -108,9 +110,22 @@ namespace Hearthhold.UnityClient
         {
             if (string.IsNullOrEmpty(smokeCapturePath)) return;
             smokeFrames++;
-            int captureFrame = smokeBattle ? 90 : 20;
+            int captureFrame = smokeBattle ? 90 : smokeDeploy ? 40 : 20;
             if (smokeFrames == captureFrame)
             {
+                if (smokeDeploy)
+                {
+                    bool visualReady = unitViews.Count == 1;
+                    foreach (GameObject unitView in unitViews.Values)
+                        visualReady = visualReady && unitView != null && unitView.activeInHierarchy && unitView.GetComponentsInChildren<Renderer>(true).Length >= 2;
+                    if (!visualReady)
+                    {
+                        Debug.LogError("HEARTHHOLD_DEPLOY_VISUAL_FAILED: deployed unit has no synchronized Unity view.");
+                        Application.Quit(5);
+                        return;
+                    }
+                    Debug.Log("HEARTHHOLD_DEPLOY_VISUAL_READY: deployed unit has an active generated-art renderer.");
+                }
                 smokeRequestedUtc = DateTime.UtcNow;
                 ScreenCapture.CaptureScreenshot(smokeCapturePath);
                 Debug.Log("HEARTHHOLD_SMOKE_CAPTURE_REQUESTED: " + smokeCapturePath);
@@ -196,7 +211,7 @@ namespace Hearthhold.UnityClient
         private void DestroyBuildingView(GameObject obj) { Destroy(obj); }
         private void Update()
         {
-            if (session == null || session.Battle != null && !session.Battle.Settled) return;
+            if (session == null) return;
             if (session.AdvanceTraining(DateTime.UtcNow)) Save();
             if (Input.GetKeyDown(KeyCode.F1)) help = !help;
             if (Input.GetKeyDown(KeyCode.Escape)) { help = false; buildKind = null; moving = -1; heal = false; selected = -1; CloseExtraModals(); }
@@ -258,6 +273,7 @@ namespace Hearthhold.UnityClient
             }
             else HidePlacementPresentation();
             UpdateSelectionPresentation();
+            UpdateDeploymentPresentation();
             saveElapsed += dt; if (saveElapsed >= 15) { Save(); saveElapsed = 0; }
         }
         private void MoveCamera() { worldCamera.transform.position = focus - worldCamera.transform.forward * 65; }
@@ -276,9 +292,7 @@ namespace Hearthhold.UnityClient
         {
             if (session.Battle != null)
             {
-                bool done = heal ? session.Battle.CastHeal(x * 1000 + 500, z * 1000 + 500) : session.Battle.Deploy(troop, x * 1000 + 500, z * 1000 + 500);
-                session.Notice = done ? "命令已执行。" : "请检查投兵区域、军队余量或法术次数。";
-                if (done && heal) heal = false;
+                TryBattleActionAt(x, z);
             }
             else if (moving >= 0) { if (session.Move(moving, x, z)) { moving = -1; RebuildBuildings(); Save(); } }
             else if (buildKind.HasValue) { if (session.Build(buildKind.Value, x, z)) { RebuildBuildings(); Save(); } }
@@ -289,6 +303,14 @@ namespace Hearthhold.UnityClient
                 { BuildingHandle handle = hit.collider.GetComponent<BuildingHandle>(); selected = handle == null ? -1 : handle.Id; }
                 else selected = -1;
             }
+        }
+        private bool TryBattleActionAt(int x, int z)
+        {
+            bool wasHealing = heal;
+            bool done = wasHealing ? session.Battle.CastHeal(x * 1000 + 500, z * 1000 + 500) : session.Battle.DeployNearest(troop, x * 1000 + 500, z * 1000 + 500);
+            session.Notice = done ? (wasHealing ? "疗愈法术已释放。" : Rules.Spec(troop).Name + "已从最近绿色战线入场。") : "请检查军队余量或法术次数。";
+            if (done && wasHealing) heal = false;
+            return done;
         }
         private void SyncBattle()
         {
@@ -453,7 +475,7 @@ namespace Hearthhold.UnityClient
                 float x = Screen.width / 2f - 270, y = Screen.height / 2f - 190;
                 Box(new Rect(x, y, 540, 380));
                 GUI.Label(new Rect(x + 25, y + 24, 480, 45), "指挥官手册 · 已暂停", heading);
-                GUI.Label(new Rect(x + 25, y + 82, 490, 220), "选择底部建筑，再点击空地建造。\n点击建筑：M 移动，U 升级，Del 拆除。\n升级议事堡可提升等级和建造数量上限。\n按 T 打开编队训练，按 I 查看兵种图鉴。\n远征在外围投兵，按 1—4 切换兵种。\nQ 选择治疗，点击友军附近恢复生命。\n本地进度每15秒保存。", label);
+                GUI.Label(new Rect(x + 25, y + 82, 490, 220), "选择底部建筑，再点击空地建造。\n点击建筑：M 移动，U 升级，Del 拆除。\n升级议事堡可提升等级和建造数量上限。\n按 T 打开编队训练，按 I 查看兵种图鉴。\n远征按 1—4 选兵；点击战场任意地块会自动吸附到最近绿色战线。\nQ 选择治疗，点击友军附近恢复生命。\n本地进度每15秒保存。", label);
                 if (GUI.Button(new Rect(x + 25, y + 315, 490, 42), "继续游戏")) help = false;
             }
             DrawExtraModals();
@@ -465,7 +487,7 @@ namespace Hearthhold.UnityClient
             foreach (Unit u in session.Battle.Units) if (u.Health > 0) { float health = u.Health / (float)u.Spec.Health; Bar(new Vector3(u.X / 1000f, 2, u.Z / 1000f), health, HealthColor(health)); }
             if (!session.Battle.Finished && GroundPoint(out Vector3 point))
             {
-                string prompt = heal ? "疗愈范围：5格" : session.Battle.CanDeploy(Mathf.FloorToInt(point.x) * 1000 + 500, Mathf.FloorToInt(point.z) * 1000 + 500) ? "可以投放 " + Rules.Spec(troop).Name : "请在橙线外投兵";
+                string prompt = heal ? "疗愈范围：5格" : "点击任意位置 · 自动从绿色战线投放";
                 Rect promptRect = new Rect(Input.mousePosition.x + 16, Screen.height - Input.mousePosition.y + 16, 180, 32);
                 Box(promptRect); GUI.Label(new Rect(promptRect.x + 9, promptRect.y + 5, promptRect.width - 18, 24), prompt, small);
             }
